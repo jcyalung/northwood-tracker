@@ -14,6 +14,9 @@ import {
 import { ChartCard, ColumnChart, PieChart, StatTile } from "./charts";
 import { CurriculumJourney } from "./curriculum-journey";
 import { DatabaseView, type DbQuery } from "./database-view";
+import { SenseisPanel } from "./senseis-panel";
+import { auth } from "@/auth";
+import { isManager, senseisCollection } from "@/lib/senseis";
 
 export const metadata: Metadata = {
   title: "Dashboard · Northwood Tracker",
@@ -43,6 +46,7 @@ export default function DashboardPage({
 const TABS = [
   { id: "overview", label: "Overview" },
   { id: "curriculum", label: "Curriculum" },
+  { id: "senseis", label: "Senseis" },
   { id: "database", label: "Database" },
 ] as const;
 
@@ -96,10 +100,32 @@ async function Tabbed({
         />
       ) : tab === "curriculum" ? (
         <CurriculumLoader />
+      ) : tab === "senseis" ? (
+        <SenseisLoader />
       ) : (
         <Dashboard />
       )}
     </>
+  );
+}
+
+// Names and emails only (never password hashes). Managers can add/remove.
+async function SenseisLoader() {
+  await connection();
+  const session = await auth();
+  const senseis = await senseisCollection()
+    .find(
+      {},
+      { projection: { _id: 0, id: 1, first_name: 1, last_name: 1, email: 1 } },
+    )
+    .sort({ last_name: 1, first_name: 1 })
+    .toArray();
+  return (
+    <SenseisPanel
+      senseis={senseis}
+      canManage={isManager(session?.user.role)}
+      myEmail={session?.user.email?.toLowerCase() ?? null}
+    />
   );
 }
 

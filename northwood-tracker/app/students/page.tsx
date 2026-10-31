@@ -3,7 +3,12 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { ToastProvider } from "@/components/toast";
-import { getAllStudents, getBelts, getSessionHistory } from "@/lib/students";
+import {
+  getAllStudents,
+  getBelts,
+  getPurchaseHistory,
+  getSessionHistory,
+} from "@/lib/students";
 import { AllStudents } from "./all-students";
 
 export const metadata: Metadata = {
@@ -37,6 +42,7 @@ async function StudentsTable() {
     <AllStudents
       students={students}
       history={await getSessionHistory()}
+      purchases={await getPurchaseHistory()}
       belts={await getBelts()}
     />
   );

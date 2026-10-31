@@ -9,10 +9,11 @@ import {
   capitalize,
   type BeltInfo,
 } from "@/lib/belts";
+import { TagChips } from "@/components/tag-chips";
 import { TagPicker } from "@/components/tag-picker";
 import { activeTags } from "@/lib/tags";
 import { PROGRAMS } from "@/lib/options";
-import type { SessionNote, Student } from "@/lib/students";
+import type { PurchaseRecord, SessionNote, Student } from "@/lib/students";
 import { ExportButton } from "./export-button";
 import { updateStudent, type StudentEdits } from "./actions";
 import { NewStudentDialog } from "./new-student-dialog";
@@ -48,10 +49,13 @@ const NO_FILTERS: Filters = {
 export function AllStudents({
   students: initialStudents,
   history,
+  purchases,
   belts,
 }: {
   students: Student[];
   history: Record<string, SessionNote[]>;
+  // Purchases by student, from the purchases collection.
+  purchases: Record<string, PurchaseRecord[]>;
   // Every belt, from the `belts` collection.
   belts: BeltInfo[];
 }) {
@@ -202,6 +206,7 @@ export function AllStudents({
                     >
                       {student.first_name} {student.last_name}
                     </button>
+                    <TagChips student={student} className="mt-1 flex" />
                   </td>
                   <td className="px-6 py-3 text-secondary">
                     {student.program ?? "—"}
@@ -257,6 +262,7 @@ export function AllStudents({
         <StudentDialog
           student={selected}
           history={selected ? (history[selected.id] ?? []) : []}
+          purchases={selected ? (purchases[selected.id] ?? []) : []}
           belts={belts}
           onSave={saveStudent}
           onClose={() => setSelectedId(null)}
@@ -430,12 +436,14 @@ function Select({
 function StudentDialog({
   student,
   history,
+  purchases,
   belts,
   onSave,
   onClose,
 }: {
   student: Student | null;
   history: SessionNote[];
+  purchases: PurchaseRecord[];
   belts: BeltInfo[];
   onSave: (id: string, edits: StudentEdits) => Promise<boolean>;
   onClose: () => void;
@@ -527,10 +535,18 @@ function StudentDialog({
                 }
               />
               <Detail label="Debrief Method" value={student.debrief_method} />
-              <Detail
-                label="Tags"
-                value={activeTags(student).join(", ") || undefined}
-              />
+              <div>
+                <dt className="font-label text-xs uppercase tracking-[0.08em] text-secondary">
+                  Tags
+                </dt>
+                <dd className="mt-1">
+                  {activeTags(student).length ? (
+                    <TagChips student={student} />
+                  ) : (
+                    "—"
+                  )}
+                </dd>
+              </div>
               <Detail
                 label="Stars"
                 value={
@@ -579,9 +595,70 @@ function StudentDialog({
               </ol>
             )}
           </section>
+
+          <PurchaseHistory purchases={purchases} />
         </div>
       )}
     </dialog>
+  );
+}
+
+// Star Store purchases, newest first. Ones from before this app (imported
+// from the stars spreadsheet) have no date.
+function PurchaseHistory({ purchases }: { purchases: PurchaseRecord[] }) {
+  const total = purchases.reduce((n, p) => n + p.stars_used, 0);
+  return (
+    <section>
+      <h3 className="font-label text-xs uppercase tracking-[0.08em] text-secondary">
+        Purchase History
+      </h3>
+      {purchases.length === 0 ? (
+        <p className="mt-2 text-secondary">No purchases yet.</p>
+      ) : (
+        <table className="mt-2 w-full text-left text-sm">
+          <thead>
+            <tr className="font-label text-xs uppercase tracking-[0.08em] text-secondary">
+              <th className="py-1.5">Item</th>
+              <th className="py-1.5 text-right">Qty</th>
+              <th className="py-1.5 text-right">Stars</th>
+              <th className="py-1.5 text-right">Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            {purchases.map((p, i) => (
+              <tr key={i} className="border-t border-secondary/20">
+                <td className="py-1.5">{p.item_purchased}</td>
+                <td className="py-1.5 text-right tabular-nums">{p.quantity}</td>
+                <td className="py-1.5 text-right tabular-nums">
+                  {p.stars_used.toLocaleString("en-US")} ★
+                </td>
+                <td className="py-1.5 text-right text-secondary">
+                  {p.date_purchased
+                    ? new Intl.DateTimeFormat("en-US", {
+                        timeZone: "America/Los_Angeles",
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      }).format(new Date(p.date_purchased))
+                    : "Before tracker"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr className="border-t-2 border-secondary/40">
+              <td className="py-1.5" colSpan={2}>
+                Total spent
+              </td>
+              <td className="py-1.5 text-right tabular-nums">
+                {total.toLocaleString("en-US")} ★
+              </td>
+              <td />
+            </tr>
+          </tfoot>
+        </table>
+      )}
+    </section>
   );
 }
 

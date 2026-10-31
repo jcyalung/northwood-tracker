@@ -11,6 +11,7 @@ type Purchase = {
   date_purchased: Date;
   stars_used: number;
   item_purchased: string;
+  quantity: number;
 };
 
 export type RedeemResult =
@@ -63,6 +64,7 @@ export async function redeemStars(input: {
     date_purchased: new Date(),
     stars_used: cost,
     item_purchased: item,
+    quantity: 1,
   });
 
   return { ok: true, stars: updated.stars ?? 0 };

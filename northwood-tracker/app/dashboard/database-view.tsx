@@ -520,9 +520,15 @@ function PageLink({
   );
 }
 
-// `_id`, `id`, and anything ending in `_id` (legacy_id, belt_id, …).
+// `_id`, `id`, and anything ending in `_id` (legacy_id, belt_id, …). Also
+// hides password hashes, which must never reach the browser.
 function isIdKey(key: string) {
-  return key === "_id" || key === "id" || key.endsWith("_id");
+  return (
+    key === "_id" ||
+    key === "id" ||
+    key.endsWith("_id") ||
+    /password|hash/i.test(key)
+  );
 }
 
 // A stored value as plain JSON for the client: ID fields removed at every

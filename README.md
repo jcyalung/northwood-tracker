@@ -28,7 +28,7 @@ stars they earn and spend.
 
 - [Next.js](https://nextjs.org) (App Router, Server Actions) + React + Tailwind CSS
 - MongoDB (Docker)
-- Google sign-in via Auth.js
+- Email + password sign-in (Auth.js; passwords hashed with scrypt). Google sign-in also works on `localhost`
 - Built to run on a Raspberry Pi 5
 
 ## Running it locally
@@ -49,7 +49,7 @@ npm run dev                   # http://localhost:3000
 | `MONGODB_DB` | Database name (defaults to `northwood`) |
 | `AUTH_SECRET` | Session encryption (`npx auth secret`) |
 | `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET` | Google OAuth client |
-| `TEST_USER` | The Google account allowed to sign in (for now) |
+| `TEST_USER` | Signs in as a manager only until the first manager is added (to set things up) |
 | `STARS_PASSWORD` | Required to change a student's stars in All Students |
 
 ## Data

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { signIn } from "@/auth";
+import { EmailSignIn } from "./email-sign-in";
 
 export const metadata: Metadata = {
   title: "Sign In · Northwood Tracker",
@@ -34,65 +35,9 @@ export default function LoginPage({ searchParams }: PageProps<"/login">) {
           <span className="h-px flex-1 bg-secondary/20" />
         </div>
 
-        <EmailSignInForm />
+        <EmailSignIn />
       </div>
     </main>
-  );
-}
-
-// Not wired up yet: the server action receives the form but does nothing.
-function EmailSignInForm() {
-  async function signInWithEmail() {
-    "use server";
-  }
-
-  return (
-    <form action={signInWithEmail} className="flex flex-col gap-4">
-      <Field id="email" label="Email" type="email" autoComplete="email" />
-      <Field
-        id="password"
-        label="Password"
-        type="password"
-        autoComplete="current-password"
-      />
-      <button
-        type="submit"
-        className="mt-2 rounded-md bg-tertiary px-5 py-3 text-on-primary transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-      >
-        Sign in
-      </button>
-    </form>
-  );
-}
-
-function Field({
-  id,
-  label,
-  type,
-  autoComplete,
-}: {
-  id: string;
-  label: string;
-  type: string;
-  autoComplete: string;
-}) {
-  return (
-    <div className="flex flex-col gap-2">
-      <label
-        htmlFor={id}
-        className="font-label text-xs uppercase tracking-[0.08em] text-secondary"
-      >
-        {label}
-      </label>
-      <input
-        id={id}
-        name={id}
-        type={type}
-        autoComplete={autoComplete}
-        required
-        className="rounded-md border border-secondary/40 bg-surface px-3 py-2 text-primary focus:border-primary focus:outline-none"
-      />
-    </div>
   );
 }
 

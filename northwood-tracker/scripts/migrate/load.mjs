@@ -19,6 +19,9 @@ const INDEXES = {
   ],
   belt_paths: [[{ belt_id: 1, belt_level: 1 }, { unique: true }]],
   belts: [[{ belt_id: 1 }, { unique: true }]],
+  purchases: [[{ student_id: 1, date_purchased: -1 }, {}]],
+  senseis: [[{ email: 1 }, { unique: true }]],
+  sessions: [[{ date: 1 }, { unique: true }]],
 };
 
 const [file, dbName, flag] = process.argv.slice(2);

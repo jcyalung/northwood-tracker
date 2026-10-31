@@ -14,6 +14,7 @@ import {
   type BeltInfo,
   type BeltPaths,
 } from "@/lib/belts";
+import { TagChips } from "@/components/tag-chips";
 import { useToast } from "@/components/toast";
 import type { Activity, Belt, SessionNote, Student } from "@/lib/students";
 import {
@@ -338,6 +339,7 @@ export function StudentCard({
                   ? activityLabel(activity, activities)
                   : noActivityLabel(student)}
               </span>
+              <TagChips student={student} className="mt-2 flex" />
             </span>
           </button>
           <div onClick={(e) => e.stopPropagation()} className="cursor-auto">

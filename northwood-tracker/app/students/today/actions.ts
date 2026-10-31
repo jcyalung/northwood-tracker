@@ -40,7 +40,7 @@ async function checkIn(
   }
   const student = await studentsCollection().findOne(
     { id: studentId },
-    { projection: { _id: 0, first_name: 1 } },
+    { projection: { _id: 0, first_name: 1, last_name: 1 } },
   );
   if (!student) return { ok: false, error: "That student doesn't exist." };
 
@@ -78,6 +78,12 @@ async function checkIn(
   };
   try {
     await sessionNotesCollection().insertOne({ ...note });
+    await addToSession(
+      date,
+      hour,
+      studentId,
+      `${student.first_name} ${student.last_name}`,
+    );
   } catch (error) {
     // The unique index caught a check-in made at the same moment.
     if ((error as { code?: number }).code === 11000) {
@@ -99,14 +105,56 @@ export async function removeCheckIn(studentId: string): Promise<CheckInResult> {
 }
 
 async function removeOne(studentId: string): Promise<CheckInResult> {
-  const result = await sessionNotesCollection().deleteOne({
-    student_id: studentId,
-    session_date: todayInPacific(),
-    finalized: { $ne: true },
-  });
-  return result.deletedCount === 1
-    ? { ok: true }
-    : { ok: false, error: "That check-in was already removed or is closed." };
+  const date = todayInPacific();
+  const removed = await sessionNotesCollection().findOneAndDelete(
+    { student_id: studentId, session_date: date, finalized: { $ne: true } },
+    { projection: { _id: 0, session_hour: 1 } },
+  );
+  if (!removed) {
+    return {
+      ok: false,
+      error: "That check-in was already removed or is closed.",
+    };
+  }
+  await sessionsCollection().updateOne(
+    { date },
+    {
+      $pull: { [`session.${removed.session_hour}`]: { student_id: studentId } },
+    },
+  );
+  return { ok: true };
+}
+
+// The day's Sessions record (rsrc/SCHEMA.md): which students were checked in
+// to each hour. Kept alongside each student's Session Note for the day.
+type SessionRecord = {
+  session_id: string;
+  date: string;
+  session: Record<string, { student_id: string; student_name: string }[]>;
+};
+const sessionsCollection = () => db.collection<SessionRecord>("sessions");
+
+// Adds a student to an hour in the day's session, creating the day's record
+// the first time someone checks in.
+async function addToSession(
+  date: string,
+  hour: string,
+  studentId: string,
+  studentName: string,
+) {
+  await sessionsCollection().updateOne(
+    { date },
+    {
+      $setOnInsert: { session_id: randomUUID(), date },
+      $push: {
+        [`session.${hour}`]: {
+          student_id: studentId,
+          student_name: studentName,
+        },
+      },
+    },
+    { upsert: true },
+  );
 }
 
 export type ScheduleChanges = {

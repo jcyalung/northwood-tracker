@@ -171,3 +171,41 @@ export async function getBelts(): Promise<BeltInfo[]> {
     .sort({ belt_id: 1 })
     .toArray();
 }
+
+// A Purchases document (rsrc/SCHEMA.md), as sent to the page: the date is an
+// ISO string, or null for purchases made before this app (from the stars
+// spreadsheet).
+export type PurchaseRecord = {
+  item_purchased: string;
+  quantity: number;
+  stars_used: number;
+  date_purchased: string | null;
+};
+
+// Every purchase, grouped by student: dated ones newest first, then the
+// undated ones from before this app.
+export async function getPurchaseHistory(): Promise<
+  Record<string, PurchaseRecord[]>
+> {
+  const purchases = await db
+    .collection<{
+      student_id: string;
+      item_purchased: string;
+      quantity?: number;
+      stars_used: number;
+      date_purchased: Date | null;
+    }>("purchases")
+    .find({}, { projection: { _id: 0 } })
+    .sort({ date_purchased: -1 })
+    .toArray();
+  const byStudent: Record<string, PurchaseRecord[]> = {};
+  for (const p of purchases) {
+    (byStudent[p.student_id] ??= []).push({
+      item_purchased: p.item_purchased,
+      quantity: p.quantity ?? 1,
+      stars_used: p.stars_used,
+      date_purchased: p.date_purchased ? p.date_purchased.toISOString() : null,
+    });
+  }
+  return byStudent;
+}
