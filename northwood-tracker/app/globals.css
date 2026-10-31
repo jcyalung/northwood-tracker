@@ -1,26 +1,102 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
+/* Heritage design tokens — see DESIGN.md */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --color-primary: #1a1c1e;
+  --color-secondary: #6c7278;
+  --color-tertiary: #b8422e;
+  --color-neutral: #f7f5f2;
+  --color-surface: #ffffff;
+  --color-on-primary: #ffffff;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  /* Every text role uses Nunito ExtraBold. */
+  --font-display: var(--font-nunito);
+  --font-body: var(--font-nunito);
+  --font-label: var(--font-nunito);
+  --font-roboto: var(--font-roboto);
+
+  /* Text sizes are 25% larger than Tailwind's defaults. */
+  --text-xs: 0.9375rem;
+  --text-sm: 1.09375rem;
+  --text-base: 1.25rem;
+  --text-xl: 1.5625rem;
+  --text-2xl: 1.875rem;
+
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 8px;
+
+  --animate-toast-in: toast-in 200ms ease-out;
+  --animate-confetti: confetti-fall 3s linear infinite;
+  --animate-bubble-pop: bubble-pop 180ms ease-out;
+
+  @keyframes confetti-fall {
+    0% {
+      transform: translateY(-14rem) rotate(0deg);
+      opacity: 0;
+    }
+    15%,
+    85% {
+      opacity: 1;
+    }
+    100% {
+      transform: translateY(14rem) rotate(540deg);
+      opacity: 0;
+    }
+  }
+
+  @keyframes bubble-pop {
+    from {
+      opacity: 0;
+      transform: scale(0.96) translateY(-0.25rem);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+
+  @keyframes toast-in {
+    from {
+      opacity: 0;
+      transform: translateY(-1rem);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 }
 
+/* Tailwind v4 gives buttons the default cursor; use the pointer everywhere. */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+/* Without motion, confetti stays put where it's scattered. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-confetti,
+  .animate-bubble-pop {
+    animation: none;
+  }
+}
+
+/* Everything is sized in rem, so the root size scales the whole app. It's
+   14.4px on a MacBook Pro's default 1512px-wide screen (where the spacing was
+   designed) and scales with the window so other desktop screens keep the
+   same proportions, within 12px (small laptops) and 17px (large monitors). */
+html {
+  font-size: clamp(12px, 0.9524vw, 17px); /* 14.4px at 1512px wide */
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-neutral);
+  color: var(--color-primary);
+  font-family: var(--font-body), sans-serif;
+  font-weight: 800;
+  font-size: 1.25rem;
+  line-height: 1.6;
 }
