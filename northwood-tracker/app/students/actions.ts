@@ -1,6 +1,6 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import { auth } from "@/auth";
 import { BELT_TYPES } from "@/lib/belts";
 import { DEBRIEF_METHODS, MAX_LEVEL, PROGRAMS, TAGS } from "@/lib/options";
@@ -141,7 +141,22 @@ export type StudentEdits = {
   program: string;
   tags: string[];
   notes: string;
+  // A new star balance; changing it needs `starsPassword`.
+  stars?: number;
+  starsPassword?: string;
 };
+
+// Largest star balance (either way) an edit can set.
+const MAX_STARS = 100_000;
+
+// Whether `given` matches STARS_PASSWORD in .env. Compares hashes in constant
+// time, so a wrong guess doesn't reveal how close it was.
+function starsPasswordMatches(given: string | undefined): boolean {
+  const expected = process.env.STARS_PASSWORD;
+  if (!expected || !given) return false;
+  const hash = (text: string) => createHash("sha256").update(text).digest();
+  return timingSafeEqual(hash(given), hash(expected));
+}
 
 export type UpdateStudentResult =
   { ok: true; student: Student } | { ok: false; error: string };
@@ -174,6 +189,26 @@ export async function updateStudent(
   if (!tagNames.every((t) => known.has(t))) {
     return { ok: false, error: "Pick tags from the list." };
   }
+  // Star changes need the password (checked here, not just in the form).
+  const starsChanged =
+    edits.stars !== undefined && edits.stars !== (current.stars ?? 0);
+  if (starsChanged) {
+    if (!Number.isInteger(edits.stars) || Math.abs(edits.stars!) > MAX_STARS) {
+      return { ok: false, error: "Stars must be a whole number." };
+    }
+    if (!process.env.STARS_PASSWORD) {
+      return {
+        ok: false,
+        error: "Editing stars isn't set up (no STARS_PASSWORD in .env).",
+      };
+    }
+    if (!starsPasswordMatches(edits.starsPassword)) {
+      // A short pause slows down guessing.
+      await new Promise((r) => setTimeout(r, 1000));
+      return { ok: false, error: "Wrong password for changing stars." };
+    }
+  }
+
   const notes = (edits.notes ?? "").trim();
   if (notes.length > 5000) return { ok: false, error: "Notes are too long." };
 
@@ -195,6 +230,7 @@ export async function updateStudent(
     : undefined;
 
   const set: Record<string, unknown> = {
+    ...(starsChanged && { stars: edits.stars }),
     parent_email,
     belt,
     program: edits.program,
