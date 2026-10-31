@@ -117,7 +117,7 @@ export function TodayBoard({
   useEffect(() => {
     let inFlight = false;
     let etag: string | null = null;
-    const timer = setInterval(async () => {
+    async function poll() {
       if (inFlight || document.visibilityState !== "visible") return;
       inFlight = true;
       try {
@@ -169,8 +169,20 @@ export function TodayBoard({
       } finally {
         inFlight = false;
       }
-    }, POLL_MS);
-    return () => clearInterval(timer);
+    }
+    const timer = setInterval(poll, POLL_MS);
+    // Coming back to the tab (checks pause while it's hidden): check right
+    // away instead of waiting for the next interval.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") poll();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
   }, [date]);
 
   // Saves right away; flips back if it fails.

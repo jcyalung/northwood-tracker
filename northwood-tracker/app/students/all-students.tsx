@@ -618,6 +618,11 @@ function StudentEditForm({
   const [program, setProgram] = useState(student.program ?? "");
   const [tags, setTags] = useState(() => activeTags(student));
   const [notes, setNotes] = useState(student.notes ?? "");
+  const currentStars = student.stars ?? 0;
+  const [stars, setStars] = useState(String(currentStars));
+  const [starsPassword, setStarsPassword] = useState("");
+  // A different balance needs the stars password.
+  const starsChanged = stars.trim() !== "" && Number(stars) !== currentStars;
 
   const isJunior = beltId === 0;
   const hasType = beltHasType(belts, beltId);
@@ -641,6 +646,7 @@ function StudentEditForm({
       program,
       tags,
       notes,
+      ...(starsChanged && { stars: Number(stars), starsPassword }),
     });
     setSaving(false);
   }
@@ -707,6 +713,36 @@ function StudentEditForm({
         allowAll={false}
       />
       <TagPicker value={tags} onChange={setTags} />
+      <div className="flex flex-col gap-4">
+        <Field label="Stars">
+          {(id) => (
+            <input
+              id={id}
+              type="number"
+              step={1}
+              inputMode="numeric"
+              value={stars}
+              onChange={(e) => setStars(e.target.value)}
+              className={`${INPUT} w-full`}
+            />
+          )}
+        </Field>
+        {starsChanged && (
+          <Field label="Password to change stars">
+            {(id) => (
+              <input
+                id={id}
+                type="password"
+                required
+                autoComplete="off"
+                value={starsPassword}
+                onChange={(e) => setStarsPassword(e.target.value)}
+                className={`${INPUT} w-full`}
+              />
+            )}
+          </Field>
+        )}
+      </div>
 
       <div className="sm:col-span-2">
         <Field label="Notes">

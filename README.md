@@ -50,6 +50,7 @@ npm run dev                   # http://localhost:3000
 | `AUTH_SECRET` | Session encryption (`npx auth secret`) |
 | `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET` | Google OAuth client |
 | `TEST_USER` | The Google account allowed to sign in (for now) |
+| `STARS_PASSWORD` | Required to change a student's stars in All Students |
 
 ## Data
 
