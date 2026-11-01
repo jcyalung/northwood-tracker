@@ -40,7 +40,7 @@ const LEVEL_UP = "level-up";
 const BELT_UP = "belt-up";
 // Notes save this long after typing stops (one small request per pause, so
 // it stays light on the Pi).
-const AUTOSAVE_MS = 1500;
+const AUTOSAVE_MS = 3000;
 
 type SaveStatus = "saved" | "unsaved" | "saving" | "error";
 type Conflicts = Partial<Record<NoteKey, { theirs: string; by?: string }>>;
@@ -80,10 +80,17 @@ export function StudentCard({
   register: (handle: CardHandle | null) => void;
 }) {
   const toast = useToast();
-  const [minimized, setMinimized] = useState(false);
+  // Already debriefed when the page loads: start minimized.
+  const [minimized, setMinimized] = useState(debriefed);
   const [belt, setBelt] = useState(student.belt);
   const [activity, setActivity] = useState(student.current_activity);
   const [busy, setBusy] = useState(false);
+  // A level or belt up waiting for "Confirm": its option value and the
+  // question to ask.
+  const [pendingProgress, setPendingProgress] = useState<{
+    value: string;
+    question: string;
+  } | null>(null);
   const [notes, setNotes] = useState<Notes>({
     working_on: note?.working_on ?? "",
     accomplished: note?.accomplished ?? "",
@@ -251,36 +258,22 @@ export function StudentCard({
     setTimeout(() => setCopied(false), 2000);
   }
 
-  // Activity changes save right away. Level and belt ups first save any
-  // pending notes, so their line lands after the latest accomplishments.
-  async function onActivityChange(value: string) {
+  // Activity changes save right away. Level and belt ups ask first.
+  async function onActivityChange(value: string, label: string) {
     if (value === LEVEL_UP || value.startsWith(BELT_UP)) {
-      setBusy(true);
-      await flush();
-      const result: ProgressResult | null = await (
-        value === LEVEL_UP
-          ? levelUp(student.id, belt)
-          : beltUp(student.id, belt, value.split(":")[1])
-      ).catch(() => null);
-      setBusy(false);
-      if (!result?.ok) {
-        toast(result?.error ?? "Couldn't save. Try again.");
-        return;
-      }
-      setBelt(result.belt);
-      setActivity(result.activity ?? undefined);
-      base.current.accomplished = result.accomplished;
-      dirty.current.delete("accomplished");
-      setNotes((n) => ({ ...n, accomplished: result.accomplished }));
-      const stars = result.starsAdded ? ` (+${result.starsAdded} ★)` : "";
-      toast(
-        value === LEVEL_UP
-          ? `${student.first_name} leveled up to ${capitalize(result.belt.belt_title)} ${result.belt.belt_level}${stars}`
-          : `${student.first_name} belted up to ${capitalize(result.belt.belt_title)} Belt${stars}`,
-      );
+      // "Level Up → White 3" -> "White 3".
+      const target = label.split("→")[1]?.trim() ?? "";
+      setPendingProgress({
+        value,
+        question:
+          value === LEVEL_UP
+            ? `Level up ${student.first_name} to ${target}?`
+            : `Belt up ${student.first_name} to ${target}?`,
+      });
       return;
     }
 
+    setPendingProgress(null);
     const chosen = activities.find((a) => activityValue(a) === value);
     if (!chosen) return;
     const previous = activity;
@@ -290,6 +283,37 @@ export function StudentCard({
       setActivity(previous);
       toast(result?.error ?? "Couldn't save the activity. Try again.");
     }
+  }
+
+  // A confirmed level or belt up. Saves any pending notes first, so its line
+  // lands after the latest accomplishments.
+  async function confirmProgress() {
+    if (!pendingProgress) return;
+    const { value } = pendingProgress;
+    setPendingProgress(null);
+    setBusy(true);
+    await flush();
+    const result: ProgressResult | null = await (
+      value === LEVEL_UP
+        ? levelUp(student.id, belt)
+        : beltUp(student.id, belt, value.split(":")[1])
+    ).catch(() => null);
+    setBusy(false);
+    if (!result?.ok) {
+      toast(result?.error ?? "Couldn't save. Try again.");
+      return;
+    }
+    setBelt(result.belt);
+    setActivity(result.activity ?? undefined);
+    base.current.accomplished = result.accomplished;
+    dirty.current.delete("accomplished");
+    setNotes((n) => ({ ...n, accomplished: result.accomplished }));
+    const stars = result.starsAdded ? ` (+${result.starsAdded} ★)` : "";
+    toast(
+      value === LEVEL_UP
+        ? `${student.first_name} leveled up to ${capitalize(result.belt.belt_title)} ${result.belt.belt_level}${stars}`
+        : `${student.first_name} belted up to ${capitalize(result.belt.belt_title)} Belt${stars}`,
+    );
   }
 
   const statusLabel = {
@@ -359,14 +383,14 @@ export function StudentCard({
 
         {!minimized && (
           <>
-            {/* Enter in any field saves the card; Shift+Enter adds a new line
-              in the notes. */}
+            {/* Ctrl+Enter (Cmd+Enter on Mac) in any field saves the card;
+              Enter adds a new line in the notes. */}
             <div
               className="mt-6 flex flex-col gap-4"
               onKeyDown={(e) => {
                 if (
                   e.key === "Enter" &&
-                  !e.shiftKey &&
+                  (e.ctrlKey || e.metaKey) &&
                   !e.nativeEvent.isComposing &&
                   e.target instanceof HTMLElement &&
                   e.target.matches("textarea, input")
@@ -386,6 +410,31 @@ export function StudentCard({
                 disabled={busy}
                 onChange={onActivityChange}
               />
+              {pendingProgress && (
+                <div
+                  role="alert"
+                  className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-amber-400 bg-amber-50 px-3 py-2 text-sm"
+                >
+                  <span>{pendingProgress.question}</span>
+                  <span className="ml-auto flex gap-2">
+                    <button
+                      type="button"
+                      autoFocus
+                      onClick={confirmProgress}
+                      className="rounded-md bg-tertiary px-3 py-1 text-on-primary hover:opacity-90"
+                    >
+                      Confirm
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPendingProgress(null)}
+                      className="rounded-md border border-primary px-3 py-1 hover:bg-neutral"
+                    >
+                      Cancel
+                    </button>
+                  </span>
+                </div>
+              )}
               {noteFields.map(({ key, label }) => (
                 <div key={key} className="flex flex-col gap-2">
                   <label
@@ -506,7 +555,7 @@ function ActivitySelect({
   // Shown when there's no current activity.
   placeholder: string;
   disabled: boolean;
-  onChange: (value: string) => void;
+  onChange: (value: string, label: string) => void;
 }) {
   const info = belts.find((b) => b.belt_id === belt.belt_id);
   const canLevelUp =
@@ -533,7 +582,9 @@ function ActivitySelect({
         id={id}
         value={current ? activityValue(current) : ""}
         disabled={disabled}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) =>
+          onChange(e.target.value, e.target.selectedOptions[0]?.text ?? "")
+        }
         className="rounded-md border border-secondary/40 bg-surface px-3 py-2 focus:border-primary focus:outline-none disabled:opacity-60"
       >
         {!current && (
@@ -576,9 +627,10 @@ function without<T extends object>(obj: T, key: keyof T): T {
   return copy;
 }
 
-// "alex@codeninjas.com" -> "alex".
-function shortName(email?: string) {
-  return email ? email.split("@")[0] : "another sensei";
+// Saved as the sensei's first name, or "Manager". Older notes have an
+// email: "alex@codeninjas.com" -> "alex".
+function shortName(by?: string) {
+  return by ? by.split("@")[0] : "another sensei";
 }
 
 // ISO timestamp -> "3:42 PM", Pacific time.

@@ -1,7 +1,11 @@
+import { cookies } from "next/headers";
 import Image from "next/image";
 import Link from "next/link";
-import type { ReactNode } from "react";
-import { signOut } from "@/auth";
+import { connection } from "next/server";
+import { Suspense, type ReactNode } from "react";
+import { auth, signOut } from "@/auth";
+import { currentSensei, SENSEI_COOKIE } from "@/lib/current-sensei";
+import { switchSensei } from "./sensei/actions";
 
 export default function Menu() {
   return (
@@ -44,21 +48,50 @@ export default function Menu() {
         </MenuButton>
       </nav>
 
-      <form
-        action={async () => {
-          "use server";
-          await signOut({ redirectTo: "/login" });
-        }}
-        className="mt-12"
-      >
-        <button
-          type="submit"
-          className="rounded-md border border-secondary/40 px-5 py-2 text-sm text-secondary transition-colors hover:border-primary hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+      <div className="mt-12 flex items-center gap-4">
+        <Suspense>
+          <SignedInAs />
+        </Suspense>
+        <form
+          action={async () => {
+            "use server";
+            (await cookies()).delete(SENSEI_COOKIE);
+            await signOut({ redirectTo: "/login" });
+          }}
         >
-          Sign out
+          <button type="submit" className={SMALL_BUTTON}>
+            Sign out
+          </button>
+        </form>
+      </div>
+    </main>
+  );
+}
+
+const SMALL_BUTTON =
+  "rounded-md border border-secondary/40 px-5 py-2 text-sm text-secondary transition-colors hover:border-primary hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
+
+// "Manager", or the sensei using the central account (with a way to switch).
+async function SignedInAs() {
+  await connection();
+  const session = await auth();
+  if (session?.user.account === "manager") {
+    return <p className="text-sm text-secondary">Signed in as Manager</p>;
+  }
+  const sensei = await currentSensei();
+  return (
+    <>
+      {sensei && (
+        <p className="text-sm text-secondary">
+          Signed in as {sensei.first_name}
+        </p>
+      )}
+      <form action={switchSensei}>
+        <button type="submit" className={SMALL_BUTTON}>
+          Switch sensei
         </button>
       </form>
-    </main>
+    </>
   );
 }
 

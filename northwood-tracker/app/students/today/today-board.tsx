@@ -19,8 +19,9 @@ import type { CardHandle } from "./student-card";
 const POLL_MS = 5000;
 
 // Client side of Students Today: who's checked in, who's been debriefed, the
-// day summary, and the hour sections. Check-ins, notes (autosaved), debriefs,
-// activities, and level/belt ups all save to MongoDB.
+// day summary, and the hour sections. Check-ins, notes (autosaved, or right
+// away with a card's Save button or Ctrl/Cmd+Enter), debriefs, activities,
+// and level/belt ups all save to MongoDB.
 export function TodayBoard({
   date,
   initialHours,
@@ -198,7 +199,7 @@ export function TodayBoard({
   }
 
   // Saves every card's pending notes, then sets everyone's last session to
-  // today. Doesn't lock the day; the 6:30 PM close does that.
+  // today. Also runs on its own at 7 PM (scripts/save-day.mjs).
   async function saveDay() {
     setSavingDay(true);
     const saved = await Promise.all(
@@ -270,7 +271,7 @@ export function TodayBoard({
               .map((s) => `${s.first_name} ${s.last_name}`)
               .join(", ")}
             . Save {unsavedStudents.length === 1 ? "their card" : "each card"}{" "}
-            (or press Enter in a field) before leaving.
+            (or press Ctrl+Enter, ⌘+Enter on Mac, in a field) before leaving.
           </span>
         </p>
       )}

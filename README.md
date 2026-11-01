@@ -10,8 +10,9 @@ stars they earn and spend.
 - **Schedule** — the lead sensei checks students in to each hour before
   sessions start (weekdays 2–5 PM, weekends 1–4 PM, Pacific time).
 - **Students Today** — one card per checked-in student. Senseis record what
-  they're working on, what they accomplished, and what's next. Notes autosave,
-  and every open copy of the page stays in sync (with a "use theirs / keep
+  they're working on, what they accomplished, and what's next. Notes autosave
+  3 seconds after typing stops (or right away with the card's Save button or
+  Ctrl+Enter, ⌘+Enter on Mac), and every open copy of the page stays in sync (with a "use theirs / keep
   mine" choice if two senseis edit the same note). Each new session starts
   from the last session's "work on next".
 - **Belts and levels** — students move through a belt curriculum (White
@@ -28,7 +29,10 @@ stars they earn and spend.
 
 - [Next.js](https://nextjs.org) (App Router, Server Actions) + React + Tailwind CSS
 - MongoDB (Docker)
-- Email + password sign-in (Auth.js; passwords hashed with scrypt). Google sign-in also works on `localhost`
+- Email + password sign-in (Auth.js; passwords hashed with scrypt) for two
+  accounts: the manager, and a central account the senseis share. After
+  signing in to the central account, each sensei picks their name, and their
+  edits say "Last edited by <first name>"
 - Built to run on a Raspberry Pi 5
 
 ## Running it locally
@@ -48,8 +52,8 @@ npm run dev                   # http://localhost:3000
 | `MONGODB_CONN` | MongoDB connection string |
 | `MONGODB_DB` | Database name (defaults to `northwood`) |
 | `AUTH_SECRET` | Session encryption (`npx auth secret`) |
-| `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET` | Google OAuth client |
-| `TEST_USER` | Signs in as a manager only until the first manager is added (to set things up) |
+| `MANAGER_EMAIL` | The manager account (adds and removes senseis). Creates its password on first sign-in |
+| `CENTRAL_EMAIL` | The shared account senseis sign in with. Creates its password on first sign-in |
 | `STARS_PASSWORD` | Required to change a student's stars in All Students |
 
 ## Data

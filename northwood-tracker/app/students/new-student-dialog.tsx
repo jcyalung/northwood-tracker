@@ -264,6 +264,17 @@ export function NewStudentDialog({
                   rows={5}
                   value={form.notes}
                   onChange={(e) => set("notes", e.target.value)}
+                  // Enter adds a new line; Ctrl+Enter (Cmd+Enter on Mac) saves.
+                  onKeyDown={(e) => {
+                    if (
+                      e.key === "Enter" &&
+                      (e.ctrlKey || e.metaKey) &&
+                      !e.nativeEvent.isComposing
+                    ) {
+                      e.preventDefault();
+                      e.currentTarget.form?.requestSubmit();
+                    }
+                  }}
                   className={`${INPUT} resize-y`}
                 />
               )}

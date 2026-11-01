@@ -77,7 +77,9 @@ export async function getSessionForDate(
   const byId = new Map(students.map((s) => [s.id, s]));
   const dayNotes = await sessionNotesCollection()
     .find({ session_date: date }, { projection: { _id: 0 } })
-    .sort({ last_edited: 1 })
+    // Check-in order: _id is set when the note is created at check-in, and
+    // (unlike last_edited) doesn't change when notes are saved.
+    .sort({ _id: 1 })
     .toArray();
 
   return {

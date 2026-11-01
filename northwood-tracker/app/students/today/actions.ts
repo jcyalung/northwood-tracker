@@ -2,7 +2,8 @@
 
 import { randomUUID } from "node:crypto";
 import { auth } from "@/auth";
-import { capitalize } from "@/lib/belts";
+import { capitalize, earnedStars } from "@/lib/belts";
+import { editedBy } from "@/lib/current-sensei";
 import { db } from "@/lib/mongodb";
 import { sessionHours, todayInPacific } from "@/lib/sessions";
 import {
@@ -26,13 +27,13 @@ export async function checkInStudent(
 ): Promise<{ ok: true; note: SessionNote } | { ok: false; error: string }> {
   const session = await auth();
   if (!session) return { ok: false, error: "You're not signed in." };
-  return checkIn(studentId, hour, session.user?.email ?? undefined);
+  return checkIn(studentId, hour, await editedBy(session));
 }
 
 async function checkIn(
   studentId: string,
   hour: string,
-  editedBy: string | undefined,
+  by: string | undefined,
 ): Promise<{ ok: true; note: SessionNote } | { ok: false; error: string }> {
   const date = todayInPacific();
   if (!sessionHours(date).includes(hour)) {
@@ -74,7 +75,7 @@ async function checkIn(
     finalized: false,
     last_edited: new Date().toISOString(),
     ...(last?.next_steps && { working_on: last.next_steps }),
-    ...(editedBy && { edited_by: editedBy }),
+    ...(by && { edited_by: by }),
   };
   try {
     await sessionNotesCollection().insertOne({ ...note });
@@ -184,11 +185,7 @@ export async function saveSchedule(
     if (!result.ok) failed.push({ studentId, error: result.error });
   }
   for (const { studentId, hour } of changes.add) {
-    const result = await checkIn(
-      studentId,
-      hour,
-      session.user?.email ?? undefined,
-    );
+    const result = await checkIn(studentId, hour, await editedBy(session));
     if (!result.ok) failed.push({ studentId, error: result.error });
   }
   return { ok: true, failed };
@@ -248,9 +245,10 @@ export async function saveNotes(
   const session = await auth();
   if (!session) return { ok: false, error: "You're not signed in." };
 
+  const by = await editedBy(session);
   const set: Record<string, unknown> = {
     last_edited: new Date().toISOString(),
-    ...(session.user?.email && { edited_by: session.user.email }),
+    ...(by && { edited_by: by }),
   };
   const unchanged: Record<string, unknown>[] = [];
   for (const key of ["working_on", "accomplished", "next_steps"] as const) {
@@ -487,11 +485,7 @@ export async function beltUp(
     return { ok: false, error: "Pick Godot or Unity." };
   }
 
-  const earned =
-    current.running_total !== null && current.stars_per_level !== null
-      ? current.running_total +
-        ((from.belt_level ?? 1) - 1) * current.stars_per_level
-      : null;
+  const earned = earnedStars(current, from.belt_level);
   const starsAdded =
     earned !== null && next.running_total !== null
       ? Math.max(0, next.running_total - earned)

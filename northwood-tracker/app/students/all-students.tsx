@@ -7,6 +7,7 @@ import {
   BELT_TYPES,
   beltHasType,
   capitalize,
+  earnedStars,
   type BeltInfo,
 } from "@/lib/belts";
 import { TagChips } from "@/components/tag-chips";
@@ -517,6 +518,7 @@ function StudentDialog({
             <StudentEditForm
               student={student}
               belts={belts}
+              hasPurchases={purchases.length > 0}
               onCancel={() => setEditing(false)}
               onSave={async (edits) => {
                 if (await onSave(student.id, edits)) setEditing(false);
@@ -603,6 +605,67 @@ function StudentDialog({
   );
 }
 
+// The stars a student would have from their belt and level alone (for
+// students whose stars were never entered), with the working shown. "Use"
+// fills in the Stars field; "Enter manually" goes to it instead.
+function StarsProjection({
+  belt,
+  level,
+  onUse,
+  onManual,
+}: {
+  belt: BeltInfo | undefined;
+  level: number | undefined;
+  onUse: (stars: number) => void;
+  onManual: () => void;
+}) {
+  const projected = earnedStars(belt, level);
+  const name = belt
+    ? `${capitalize(belt.title)}${level === undefined ? "" : ` ${level}`}`
+    : "this belt";
+
+  return (
+    <div
+      role="status"
+      className="flex flex-col gap-2 rounded-md border border-amber-400 bg-amber-50 px-3 py-2 text-sm"
+    >
+      {projected === null || !belt ? (
+        <p>
+          {name} has no star values to project from. Enter their stars manually.
+        </p>
+      ) : (
+        <p>
+          Projected for {name}:{" "}
+          <strong>{projected.toLocaleString("en-US")} ★</strong>
+          <span className="block text-secondary">
+            {belt.running_total} for reaching {capitalize(belt.title)}
+            {(level ?? 1) > 1 &&
+              ` + ${(level ?? 1) - 1} × ${belt.stars_per_level} per level`}
+          </span>
+        </p>
+      )}
+      <span className="flex flex-wrap gap-2">
+        {projected !== null && belt && (
+          <button
+            type="button"
+            onClick={() => onUse(projected)}
+            className="rounded-md bg-tertiary px-3 py-1 text-on-primary hover:opacity-90"
+          >
+            Use {projected.toLocaleString("en-US")}
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={onManual}
+          className="rounded-md border border-primary px-3 py-1 hover:bg-neutral"
+        >
+          Enter manually
+        </button>
+      </span>
+    </div>
+  );
+}
+
 // Star Store purchases, newest first. Ones from before this app (imported
 // from the stars spreadsheet) have no date.
 function PurchaseHistory({ purchases }: { purchases: PurchaseRecord[] }) {
@@ -677,11 +740,14 @@ function Detail({ label, value }: { label: string; value?: string }) {
 function StudentEditForm({
   student,
   belts,
+  hasPurchases,
   onSave,
   onCancel,
 }: {
   student: Student;
   belts: BeltInfo[];
+  // Any Star Store purchases (then stars can't be projected from the belt).
+  hasPurchases: boolean;
   // Resolves once saved (or failed; the form stays open then).
   onSave: (edits: StudentEdits) => Promise<void>;
   onCancel: () => void;
@@ -700,6 +766,11 @@ function StudentEditForm({
   const [starsPassword, setStarsPassword] = useState("");
   // A different balance needs the stars password.
   const starsChanged = stars.trim() !== "" && Number(stars) !== currentStars;
+  const starsInput = useRef<HTMLInputElement>(null);
+  // 0 stars and nothing bought: likely never entered, so offer to work them
+  // out from the belt.
+  const canCalculateStars = currentStars === 0 && !hasPurchases;
+  const [showProjection, setShowProjection] = useState(false);
 
   const isJunior = beltId === 0;
   const hasType = beltHasType(belts, beltId);
@@ -795,6 +866,7 @@ function StudentEditForm({
           {(id) => (
             <input
               id={id}
+              ref={starsInput}
               type="number"
               step={1}
               inputMode="numeric"
@@ -804,6 +876,30 @@ function StudentEditForm({
             />
           )}
         </Field>
+        {canCalculateStars &&
+          (showProjection ? (
+            <StarsProjection
+              belt={belts.find((b) => b.belt_id === beltId)}
+              level={isJunior ? undefined : level}
+              onUse={(projected) => {
+                setStars(String(projected));
+                setShowProjection(false);
+              }}
+              onManual={() => {
+                setShowProjection(false);
+                starsInput.current?.focus();
+                starsInput.current?.select();
+              }}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowProjection(true)}
+              className="w-fit text-sm text-secondary underline underline-offset-2 hover:text-primary"
+            >
+              Calculate stars
+            </button>
+          ))}
         {starsChanged && (
           <Field label="Password to change stars">
             {(id) => (
@@ -829,6 +925,17 @@ function StudentEditForm({
               rows={4}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
+              // Enter adds a new line; Ctrl+Enter (Cmd+Enter on Mac) saves.
+              onKeyDown={(e) => {
+                if (
+                  e.key === "Enter" &&
+                  (e.ctrlKey || e.metaKey) &&
+                  !e.nativeEvent.isComposing
+                ) {
+                  e.preventDefault();
+                  e.currentTarget.form?.requestSubmit();
+                }
+              }}
               className={`${INPUT} w-full resize-y`}
             />
           )}

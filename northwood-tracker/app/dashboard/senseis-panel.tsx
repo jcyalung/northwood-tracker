@@ -8,16 +8,14 @@ const LABEL = "font-label text-xs uppercase tracking-[0.08em] text-secondary";
 const INPUT =
   "rounded-md border border-secondary/40 bg-surface px-3 py-2 focus:border-primary focus:outline-none";
 
-// The senseis list (names and emails). Managers can add and remove senseis;
-// nobody can remove themselves.
+// The senseis list (names and emails). The manager account can add and
+// remove senseis.
 export function SenseisPanel({
   senseis: initial,
   canManage,
-  myEmail,
 }: {
   senseis: SenseiRow[];
   canManage: boolean;
-  myEmail: string | null;
 }) {
   const [senseis, setSenseis] = useState(initial);
   const [confirming, setConfirming] = useState<string | null>(null);
@@ -62,21 +60,15 @@ export function SenseisPanel({
             </thead>
             <tbody>
               {senseis.map((s) => {
-                const isMe = s.email === myEmail;
                 return (
                   <tr key={s.id} className="border-t border-secondary/20">
                     <td className="px-6 py-3">
                       {s.first_name} {s.last_name}
-                      {isMe && (
-                        <span className="ml-2 text-sm text-secondary">
-                          (you)
-                        </span>
-                      )}
                     </td>
                     <td className="px-6 py-3 text-secondary">{s.email}</td>
                     {canManage && (
                       <td className="px-6 py-3 text-right">
-                        {isMe ? null : confirming === s.id ? (
+                        {confirming === s.id ? (
                           <span className="inline-flex items-center gap-2 text-sm">
                             Remove?
                             <button
@@ -124,7 +116,7 @@ export function SenseisPanel({
               ),
             );
             setMessage({
-              text: `Added ${row.first_name} ${row.last_name}. They'll create a password when they first sign in.`,
+              text: `Added ${row.first_name} ${row.last_name}. They can pick their name after signing in to the center account.`,
             });
           }}
           onError={(text) => setMessage({ text, error: true })}

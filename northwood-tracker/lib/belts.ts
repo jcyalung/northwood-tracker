@@ -42,6 +42,19 @@ export function sameActivity(a: Activity, b: Activity) {
     : a.title === b.title;
 }
 
+// Stars a student has earned by reaching a belt level: the belt's running
+// total plus its stars per level for each level past the first. Null when
+// the belt has no star values (Junior, Bronze and up).
+export function earnedStars(
+  belt: Pick<BeltInfo, "running_total" | "stars_per_level"> | undefined,
+  level: number | undefined,
+): number | null {
+  if (!belt || belt.running_total === null || belt.stars_per_level === null) {
+    return null;
+  }
+  return belt.running_total + ((level ?? 1) - 1) * belt.stars_per_level;
+}
+
 export function capitalize(word: string) {
   return word.charAt(0).toUpperCase() + word.slice(1);
 }

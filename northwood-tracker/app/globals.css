@@ -13,7 +13,6 @@
   --font-display: var(--font-nunito);
   --font-body: var(--font-nunito);
   --font-label: var(--font-nunito);
-  --font-roboto: var(--font-roboto);
 
   /* Text sizes are 25% larger than Tailwind's defaults. */
   --text-xs: 0.9375rem;

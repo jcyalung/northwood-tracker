@@ -2,12 +2,7 @@
 
 import { randomUUID } from "node:crypto";
 import { auth } from "@/auth";
-import {
-  isManager,
-  MANAGER_ROLES,
-  ROLES,
-  senseisCollection,
-} from "@/lib/senseis";
+import { ROLES, senseisCollection } from "@/lib/senseis";
 
 export type SenseiRow = {
   id: string;
@@ -20,10 +15,11 @@ export type SenseiResult =
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-// Managers only, checked here (Server Functions can be called directly).
+// The manager account only, checked here (Server Functions can be called
+// directly).
 async function requireManager() {
   const session = await auth();
-  return session && isManager(session.user.role) ? session : null;
+  return session?.user.account === "manager" ? session : null;
 }
 
 export async function addSensei(input: {
@@ -33,7 +29,7 @@ export async function addSensei(input: {
   role_id: number;
 }): Promise<SenseiResult> {
   if (!(await requireManager())) {
-    return { ok: false, error: "Only managers can add senseis." };
+    return { ok: false, error: "Only the manager can add senseis." };
   }
   const first_name = input.first_name?.trim();
   const last_name = input.last_name?.trim();
@@ -49,7 +45,6 @@ export async function addSensei(input: {
 
   const sensei = { id: randomUUID(), first_name, last_name, email, role };
   try {
-    // No password yet: they create one the first time they sign in.
     await senseisCollection().insertOne({ ...sensei });
   } catch (error) {
     if ((error as { code?: number }).code === 11000) {
@@ -61,26 +56,12 @@ export async function addSensei(input: {
 }
 
 export async function removeSensei(id: string): Promise<SenseiResult> {
-  const session = await requireManager();
-  if (!session)
-    return { ok: false, error: "Only managers can remove senseis." };
-
-  const sensei = await senseisCollection().findOne(
-    { id },
-    { projection: { _id: 0, email: 1, role: 1 } },
-  );
-  if (!sensei) return { ok: false, error: "That sensei was already removed." };
-  if (sensei.email === session.user.email?.toLowerCase()) {
-    return { ok: false, error: "You can't remove yourself." };
+  if (!(await requireManager())) {
+    return { ok: false, error: "Only the manager can remove senseis." };
   }
-  if (isManager(sensei.role)) {
-    const managers = await senseisCollection().countDocuments({
-      "role.role_id": { $in: MANAGER_ROLES.map((r) => r.role_id) },
-    });
-    if (managers <= 1) {
-      return { ok: false, error: "There has to be at least one manager." };
-    }
+  const { deletedCount } = await senseisCollection().deleteOne({ id });
+  if (!deletedCount) {
+    return { ok: false, error: "That sensei was already removed." };
   }
-  await senseisCollection().deleteOne({ id });
   return { ok: true };
 }

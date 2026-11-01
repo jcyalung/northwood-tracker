@@ -16,7 +16,7 @@ import { CurriculumJourney } from "./curriculum-journey";
 import { DatabaseView, type DbQuery } from "./database-view";
 import { SenseisPanel } from "./senseis-panel";
 import { auth } from "@/auth";
-import { isManager, senseisCollection } from "@/lib/senseis";
+import { senseisCollection } from "@/lib/senseis";
 
 export const metadata: Metadata = {
   title: "Dashboard · Northwood Tracker",
@@ -109,7 +109,7 @@ async function Tabbed({
   );
 }
 
-// Names and emails only (never password hashes). Managers can add/remove.
+// Names and emails. Only the manager account can add/remove.
 async function SenseisLoader() {
   await connection();
   const session = await auth();
@@ -123,8 +123,7 @@ async function SenseisLoader() {
   return (
     <SenseisPanel
       senseis={senseis}
-      canManage={isManager(session?.user.role)}
-      myEmail={session?.user.email?.toLowerCase() ?? null}
+      canManage={session?.user.account === "manager"}
     />
   );
 }
