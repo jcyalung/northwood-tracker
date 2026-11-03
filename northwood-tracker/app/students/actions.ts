@@ -2,6 +2,8 @@
 
 import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import { auth } from "@/auth";
+import { logActor } from "@/lib/current-sensei";
+import { logIfFailed } from "@/lib/logs";
 import { BELT_TYPES } from "@/lib/belts";
 import { DEBRIEF_METHODS, MAX_LEVEL, PROGRAMS, TAGS } from "@/lib/options";
 import { db } from "@/lib/mongodb";
@@ -36,6 +38,21 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // Inserts a new student into MongoDB. Server Functions can be called with a
 // direct POST, so this checks sign-in and validates everything itself.
 export async function createStudent(
+  input: NewStudentInput,
+): Promise<CreateStudentResult> {
+  const result = await insertStudent(input);
+  if (!result.ok) {
+    const name = `${input.first_name ?? ""} ${input.last_name ?? ""}`.trim();
+    logIfFailed(
+      `new student ${name || "(no name)"}`,
+      result,
+      await logActor(await auth()),
+    );
+  }
+  return result;
+}
+
+async function insertStudent(
   input: NewStudentInput,
 ): Promise<CreateStudentResult> {
   if (!(await auth())) return { ok: false, error: "You're not signed in." };
@@ -164,6 +181,27 @@ export type UpdateStudentResult =
 // Saves edits from the All Students window. Tags keep their expiry; a belt
 // or level change starts them on that level's first activity.
 export async function updateStudent(
+  studentId: string,
+  edits: StudentEdits,
+): Promise<UpdateStudentResult> {
+  const result = await saveStudentEdits(studentId, edits);
+  if (!result.ok) {
+    const student = await studentsCollection()
+      .findOne(
+        { id: studentId },
+        { projection: { _id: 0, first_name: 1, last_name: 1 } },
+      )
+      .catch(() => null);
+    logIfFailed(
+      `edits for ${student ? `${student.first_name} ${student.last_name}` : studentId}`,
+      result,
+      await logActor(await auth()),
+    );
+  }
+  return result;
+}
+
+async function saveStudentEdits(
   studentId: string,
   edits: StudentEdits,
 ): Promise<UpdateStudentResult> {

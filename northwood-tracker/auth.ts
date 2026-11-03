@@ -1,6 +1,7 @@
 import NextAuth, { type DefaultSession } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { accountFor, findPasswordHash, type Account } from "@/lib/accounts";
+import { log, logError } from "@/lib/logs";
 import { verifyPassword } from "@/lib/password";
 
 declare module "next-auth" {
@@ -21,18 +22,44 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     // Only MANAGER_EMAIL and CENTRAL_EMAIL (lib/accounts.ts) can sign in.
     Credentials({
       credentials: { email: {}, password: {} },
-      async authorize(credentials) {
+      async authorize(credentials, request) {
         const email = String(credentials?.email ?? "")
           .trim()
           .toLowerCase();
         const password = String(credentials?.password ?? "");
         const account = accountFor(email);
-        const hash = account ? await findPasswordHash(email) : null;
+        // nginx passes the device's address along.
+        const from = request.headers.get("x-forwarded-for")?.split(",")[0];
+        let hash: string | null;
+        try {
+          hash = account ? await findPasswordHash(email) : null;
+        } catch (error) {
+          logError(error, `Sign-in for ${email}`);
+          throw error;
+        }
         if (!account || !hash || !(await verifyPassword(password, hash))) {
+          log("warn", "sign-in", `Failed sign-in for ${email || "(no email)"}`, {
+            detail: [
+              !account
+                ? "Not the manager or center email"
+                : !hash
+                  ? "No password set yet"
+                  : "Wrong password",
+              from && `from ${from}`,
+            ]
+              .filter(Boolean)
+              .join(", "),
+          });
           // A short pause slows down password guessing.
           await wait(1000);
           return null;
         }
+        log(
+          "info",
+          "sign-in",
+          account === "manager" ? "Manager signed in" : "Center account signed in",
+          { detail: from && `from ${from}` },
+        );
         return {
           id: email,
           email,

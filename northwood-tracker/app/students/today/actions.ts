@@ -1,9 +1,11 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
+import type { Session } from "next-auth";
 import { auth } from "@/auth";
 import { capitalize, earnedStars } from "@/lib/belts";
-import { editedBy } from "@/lib/current-sensei";
+import { editedBy, logActor } from "@/lib/current-sensei";
+import { log, logIfFailed } from "@/lib/logs";
 import { db } from "@/lib/mongodb";
 import { sessionHours, todayInPacific } from "@/lib/sessions";
 import {
@@ -27,10 +29,57 @@ export async function checkInStudent(
 ): Promise<{ ok: true; note: SessionNote } | { ok: false; error: string }> {
   const session = await auth();
   if (!session) return { ok: false, error: "You're not signed in." };
-  return checkIn(studentId, hour, await editedBy(session));
+  return checkIn(studentId, hour, session);
 }
 
 async function checkIn(
+  studentId: string,
+  hour: string,
+  session: Session,
+): Promise<{ ok: true; note: SessionNote } | { ok: false; error: string }> {
+  const actor = await logActor(session);
+  const result = await addCheckIn(studentId, hour, await editedBy(session));
+  if (result.ok) {
+    log("info", "check-in", `Checked in ${await studentName(studentId)} at ${hour}`, {
+      by: actor,
+    });
+  } else {
+    log("warn", "check-in", `Couldn't check in ${await studentName(studentId)} at ${hour}`, {
+      by: actor,
+      detail: result.error,
+    });
+  }
+  return result;
+}
+
+// "First Last" for log entries, or the id if they're not found.
+async function studentName(studentId: string): Promise<string> {
+  const student = await studentsCollection()
+    .findOne(
+      { id: studentId },
+      { projection: { _id: 0, first_name: 1, last_name: 1 } },
+    )
+    .catch(() => null);
+  return student ? `${student.first_name} ${student.last_name}` : studentId;
+}
+
+// Logs a failed save for a student, then returns the result unchanged.
+async function logFailure<T extends { ok: boolean }>(
+  what: string,
+  studentId: string,
+  result: T,
+): Promise<T> {
+  if (!result.ok) {
+    logIfFailed(
+      `${what} for ${await studentName(studentId)}`,
+      result,
+      await logActor(await auth()),
+    );
+  }
+  return result;
+}
+
+async function addCheckIn(
   studentId: string,
   hour: string,
   by: string | undefined,
@@ -101,11 +150,31 @@ async function checkIn(
 // Removes a student's check-in for today, along with any notes written for
 // it. Finalized (closed) days can't be changed.
 export async function removeCheckIn(studentId: string): Promise<CheckInResult> {
-  if (!(await auth())) return { ok: false, error: "You're not signed in." };
-  return removeOne(studentId);
+  const session = await auth();
+  if (!session) return { ok: false, error: "You're not signed in." };
+  return removeOne(studentId, session);
 }
 
-async function removeOne(studentId: string): Promise<CheckInResult> {
+async function removeOne(
+  studentId: string,
+  session: Session,
+): Promise<CheckInResult> {
+  const name = await studentName(studentId);
+  const result = await deleteCheckIn(studentId);
+  if (result.ok) {
+    log("info", "check-in", `Removed ${name}'s check-in`, {
+      by: await logActor(session),
+    });
+  } else {
+    log("warn", "check-in", `Couldn't remove ${name}'s check-in`, {
+      by: await logActor(session),
+      detail: result.error,
+    });
+  }
+  return result;
+}
+
+async function deleteCheckIn(studentId: string): Promise<CheckInResult> {
   const date = todayInPacific();
   const removed = await sessionNotesCollection().findOneAndDelete(
     { student_id: studentId, session_date: date, finalized: { $ne: true } },
@@ -181,11 +250,11 @@ export async function saveSchedule(
 
   const failed: { studentId: string; error: string }[] = [];
   for (const studentId of changes.remove) {
-    const result = await removeOne(studentId);
+    const result = await removeOne(studentId, session);
     if (!result.ok) failed.push({ studentId, error: result.error });
   }
   for (const { studentId, hour } of changes.add) {
-    const result = await checkIn(studentId, hour, await editedBy(session));
+    const result = await checkIn(studentId, hour, session);
     if (!result.ok) failed.push({ studentId, error: result.error });
   }
   return { ok: true, failed };
@@ -238,6 +307,18 @@ export type SaveNotesResult =
 // has changed since, nothing is saved and the current values come back, so
 // nobody's work is overwritten without them choosing to.
 export async function saveNotes(
+  studentId: string,
+  fields: NoteFields,
+  bases: NoteFields,
+): Promise<SaveNotesResult> {
+  return logFailure(
+    "notes",
+    studentId,
+    await writeNotes(studentId, fields, bases),
+  );
+}
+
+async function writeNotes(
   studentId: string,
   fields: NoteFields,
   bases: NoteFields,
@@ -312,8 +393,29 @@ export async function setDebriefed(
   studentId: string,
   debriefed: boolean,
 ): Promise<ActionResult> {
-  if (!(await auth())) return { ok: false, error: "You're not signed in." };
-  return updateToday(studentId, { $set: { debriefed: debriefed === true } });
+  const session = await auth();
+  if (!session) return { ok: false, error: "You're not signed in." };
+  const result = await updateToday(studentId, {
+    $set: { debriefed: debriefed === true },
+  });
+  const name = await studentName(studentId);
+  const by = await logActor(session);
+  if (result.ok) {
+    log(
+      "info",
+      "debrief",
+      debriefed === true
+        ? `Marked ${name} as debriefed`
+        : `Unmarked ${name} as debriefed`,
+      { by },
+    );
+  } else {
+    log("warn", "debrief", `Couldn't save ${name}'s debrief`, {
+      by,
+      detail: result.error,
+    });
+  }
+  return result;
 }
 
 async function activitiesFor(belt: { belt_id: number; belt_level?: number }) {
@@ -331,6 +433,17 @@ async function activitiesFor(belt: { belt_id: number; belt_level?: number }) {
 
 // Sets the student's current activity (one from their current level).
 export async function changeActivity(
+  studentId: string,
+  activityId: string,
+): Promise<ActionResult> {
+  return logFailure(
+    "activity",
+    studentId,
+    await setActivity(studentId, activityId),
+  );
+}
+
+async function setActivity(
   studentId: string,
   activityId: string,
 ): Promise<ActionResult> {
@@ -431,6 +544,13 @@ export async function levelUp(
   studentId: string,
   from: { belt_id: number; belt_level?: number },
 ): Promise<ProgressResult> {
+  return logFailure("level up", studentId, await levelUpOne(studentId, from));
+}
+
+async function levelUpOne(
+  studentId: string,
+  from: { belt_id: number; belt_level?: number },
+): Promise<ProgressResult> {
   if (!(await auth())) return { ok: false, error: "You're not signed in." };
   const belt = (await getBelts()).find((b) => b.belt_id === from.belt_id);
   const level = from.belt_level;
@@ -460,6 +580,18 @@ export async function levelUp(
 // stars (next belt's running total minus what they've earned), none for
 // Junior or Bronze and up. Moving to a typed belt needs Godot or Unity.
 export async function beltUp(
+  studentId: string,
+  from: { belt_id: number; belt_level?: number },
+  beltType?: string,
+): Promise<ProgressResult> {
+  return logFailure(
+    "belt up",
+    studentId,
+    await beltUpOne(studentId, from, beltType),
+  );
+}
+
+async function beltUpOne(
   studentId: string,
   from: { belt_id: number; belt_level?: number },
   beltType?: string,
@@ -510,7 +642,8 @@ export async function beltUp(
 export async function saveDay(): Promise<
   { ok: true; students: number } | { ok: false; error: string }
 > {
-  if (!(await auth())) return { ok: false, error: "You're not signed in." };
+  const session = await auth();
+  if (!session) return { ok: false, error: "You're not signed in." };
   const date = todayInPacific();
   const ids = await sessionNotesCollection().distinct("student_id", {
     session_date: date,
@@ -521,5 +654,11 @@ export async function saveDay(): Promise<
       { $set: { last_session: date } },
     );
   }
+  log(
+    "info",
+    "save-day",
+    `Saved the day (${ids.length} ${ids.length === 1 ? "student" : "students"})`,
+    { by: await logActor(session) },
+  );
   return { ok: true, students: ids.length };
 }

@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useState } from "react";
 import { capitalize, type BeltInfo } from "@/lib/belts";
+import type { GuideBelt, GuideLevel } from "@/lib/debrief-guide";
 import type { Activity, CurriculumBelt } from "@/lib/students";
 
 const TYPE_LABELS: Record<string, string> = {
@@ -24,16 +25,35 @@ const ROW_GAP = 1;
 
 const LABEL = "font-label text-xs uppercase tracking-[0.08em] text-secondary";
 
+// What each activity type is, for the Debrief Helper.
+const TYPE_MEANINGS: Record<string, string> = {
+  build:
+    "A guided project: the ninja follows step-by-step instructions to make a game.",
+  quest:
+    "A challenge: the ninja uses what they learned in the level's builds, with less guidance.",
+  adventure:
+    "The level's wrap-up project: the ninja puts the level's concepts to use in their own creation.",
+  prove:
+    "A challenge after the build: the ninja changes or extends what they just built on their own.",
+  mastery:
+    "The belt's final, independent project, showing what the ninja learned across the belt.",
+};
+
 // The belt journey: belt icons along a timeline. Clicking a belt pops a
 // bubble with its levels branching off; clicking a level shows its
-// activities.
+// activities. With a `guide` (the Debrief Helper), the bubble also says
+// what the belt teaches and each level's concepts, and activities can be
+// clicked for their talking points.
 export function CurriculumJourney({
   belts,
   beltInfo,
+  guide,
 }: {
   belts: CurriculumBelt[];
   // Belt colors, from the `belts` collection.
   beltInfo: BeltInfo[];
+  // From content/debrief-help.md, matched to belts by belt_id.
+  guide?: GuideBelt[];
 }) {
   const [openBelt, setOpenBelt] = useState<number | null>(null);
   const [openLevel, setOpenLevel] = useState<number | null>(null);
@@ -49,6 +69,7 @@ export function CurriculumJourney({
   const index = belts.findIndex((b) => b.belt_id === openBelt);
   const belt = index >= 0 ? belts[index] : null;
   const level = belt?.levels.find((l) => l.belt_level === openLevel) ?? null;
+  const beltGuide = guide?.find((g) => g.belt_id === belt?.belt_id);
   // Centers of the evenly spaced belt columns, as % of the timeline width.
   const center = (i: number) => ((i + 0.5) / belts.length) * 100;
 
@@ -125,11 +146,19 @@ export function CurriculumJourney({
             />
             <h2 className="font-display text-xl leading-tight">
               {capitalize(belt.belt_title)} Belt
+              {beltGuide?.subtitle && (
+                <span className="text-secondary"> · {beltGuide.subtitle}</span>
+              )}
               <span className="ml-2 text-sm text-secondary">
                 {belt.levels.length}{" "}
                 {belt.levels.length === 1 ? "level" : "levels"} · choose a level
               </span>
             </h2>
+            {beltGuide?.summary && (
+              <p className="mt-2 max-w-3xl">
+                <Markdown text={beltGuide.summary} />
+              </p>
+            )}
             <LevelTree
               belt={belt}
               color={
@@ -139,12 +168,26 @@ export function CurriculumJourney({
               openLevel={openLevel}
               onToggle={(l) => setOpenLevel(openLevel === l ? null : l)}
             />
-            {level && (
+            {level ? (
               <Activities
                 belt={belt}
                 level={level.belt_level}
                 activities={level.activities}
+                guide={
+                  guide
+                    ? (beltGuide?.levels.find(
+                        (l) => l.level === level.belt_level,
+                      ) ?? null)
+                    : undefined
+                }
               />
+            ) : (
+              beltGuide && (
+                <ConceptsByLevel
+                  levels={beltGuide.levels}
+                  onOpen={(l) => setOpenLevel(l)}
+                />
+              )
             )}
           </div>
         )}
@@ -246,11 +289,17 @@ function Activities({
   belt,
   level,
   activities,
+  guide,
 }: {
   belt: CurriculumBelt;
   level: number;
   activities: Activity[];
+  // Debrief Helper only: activities become buttons showing these concepts.
+  guide?: GuideLevel | null;
 }) {
+  const [open, setOpen] = useState<number | null>(null);
+  const clickable = guide !== undefined;
+  const activity = open !== null ? activities[open] : null;
   return (
     <section
       key={level}
@@ -263,26 +312,154 @@ function Activities({
           {activities.length === 1 ? "activity" : "activities"}
         </span>
       </h3>
+      {guide && (
+        <p className="text-sm text-secondary">
+          <Markdown text={guide.label} />
+          {clickable && " · choose an activity"}
+        </p>
+      )}
       <ol className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-        {activities.map((a, i) => (
-          <li
-            key={a.activity_id ?? i}
-            className="flex items-baseline gap-3 rounded-md border border-secondary/20 px-3 py-2"
-          >
-            <span className="text-sm text-secondary tabular-nums">
-              {i + 1}.
-            </span>
-            <span className="min-w-0">
-              <span className={`block ${LABEL}`}>
-                {TYPE_LABELS[a.type ?? ""] ?? a.type ?? "Activity"}
+        {activities.map((a, i) => {
+          const content = (
+            <>
+              <span className="text-sm text-secondary tabular-nums">
+                {i + 1}.
               </span>
-              <span>{a.title}</span>
-            </span>
+              <span className="min-w-0">
+                <span className={`block ${LABEL}`}>{typeLabel(a)}</span>
+                <span>{a.title}</span>
+              </span>
+            </>
+          );
+          return (
+            <li key={a.activity_id ?? i}>
+              {clickable ? (
+                <button
+                  type="button"
+                  onClick={() => setOpen(open === i ? null : i)}
+                  aria-expanded={open === i}
+                  aria-controls="activity-detail"
+                  className={`flex h-full w-full items-baseline gap-3 rounded-md border px-3 py-2 text-left transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
+                    open === i
+                      ? "border-primary bg-neutral"
+                      : "border-secondary/20"
+                  }`}
+                >
+                  {content}
+                </button>
+              ) : (
+                <div className="flex h-full items-baseline gap-3 rounded-md border border-secondary/20 px-3 py-2">
+                  {content}
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+      {clickable && activity && (
+        <div
+          id="activity-detail"
+          key={open}
+          className="animate-bubble-pop mt-4 rounded-lg border border-secondary/30 bg-neutral/60 p-4"
+        >
+          <p className={LABEL}>{typeLabel(activity)}</p>
+          <h4 className="font-display text-lg leading-tight">
+            {activity.title}
+          </h4>
+          {TYPE_MEANINGS[activity.type ?? ""] && (
+            <p className="mt-1 text-sm text-secondary">
+              {TYPE_MEANINGS[activity.type ?? ""]}
+            </p>
+          )}
+          {guide ? (
+            <>
+              <p className={`mt-3 ${LABEL}`}>
+                What they practice · <Markdown text={guide.label} />
+              </p>
+              <ul className="mt-1 list-disc space-y-1 pl-5">
+                {guide.concepts.map((c, i) => (
+                  <li key={i}>
+                    <Markdown text={c} />
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : (
+            <p className="mt-3 text-sm text-secondary">
+              No talking points for this level in content/debrief-help.md.
+            </p>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function typeLabel(a: Activity) {
+  return TYPE_LABELS[a.type ?? ""] ?? a.type ?? "Activity";
+}
+
+// Every level's focus and concepts, shown under a belt until a level is
+// picked. Clicking a level's name opens it.
+function ConceptsByLevel({
+  levels,
+  onOpen,
+}: {
+  levels: GuideLevel[];
+  onOpen: (level: number) => void;
+}) {
+  return (
+    <section className="mt-6 border-t border-secondary/20 pt-4">
+      <h3 className="font-display text-lg leading-tight">Concepts by level</h3>
+      <ol className="mt-3 grid gap-4 lg:grid-cols-2">
+        {levels.map((l) => (
+          <li key={l.level}>
+            <button
+              type="button"
+              onClick={() => onOpen(l.level)}
+              className="text-left font-medium underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            >
+              Level {l.level} · <Markdown text={l.label} />
+            </button>
+            <ul className="mt-1 list-disc space-y-1 pl-5 text-sm">
+              {l.concepts.map((c, i) => (
+                <li key={i}>
+                  <Markdown text={c} />
+                </li>
+              ))}
+            </ul>
           </li>
         ))}
       </ol>
     </section>
   );
+}
+
+// The inline markdown in content/debrief-help.md: **bold**, *italic*, and
+// `code`. Everything else is plain text.
+export function Markdown({ text }: { text: string }) {
+  return text
+    .split(/(\*\*[^*]+\*\*|`[^`]+`|\*[^*\s][^*]*\*)/)
+    .map((part, i) =>
+      part.startsWith("**") && part.endsWith("**") && part.length > 4 ? (
+        <strong key={i} className="font-semibold">
+          <Markdown text={part.slice(2, -2)} />
+        </strong>
+      ) : part.startsWith("`") && part.endsWith("`") && part.length > 2 ? (
+        <code
+          key={i}
+          className="rounded bg-neutral px-1 py-0.5 font-mono text-[0.85em]"
+        >
+          {part.slice(1, -1)}
+        </code>
+      ) : part.startsWith("*") && part.endsWith("*") && part.length > 2 ? (
+        <em key={i}>
+          <Markdown text={part.slice(1, -1)} />
+        </em>
+      ) : (
+        part
+      ),
+    );
 }
 
 // Whether a hex color is light enough to need dark text on it.

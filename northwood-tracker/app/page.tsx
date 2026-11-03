@@ -1,11 +1,10 @@
-import { cookies } from "next/headers";
 import Image from "next/image";
 import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense, type ReactNode } from "react";
-import { auth, signOut } from "@/auth";
-import { currentSensei, SENSEI_COOKIE } from "@/lib/current-sensei";
-import { switchSensei } from "./sensei/actions";
+import { auth } from "@/auth";
+import { currentSensei } from "@/lib/current-sensei";
+import { signOutAction, switchSensei } from "./sensei/actions";
 
 export default function Menu() {
   return (
@@ -53,11 +52,7 @@ export default function Menu() {
           <SignedInAs />
         </Suspense>
         <form
-          action={async () => {
-            "use server";
-            (await cookies()).delete(SENSEI_COOKIE);
-            await signOut({ redirectTo: "/login" });
-          }}
+          action={signOutAction}
         >
           <button type="submit" className={SMALL_BUTTON}>
             Sign out

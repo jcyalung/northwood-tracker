@@ -230,6 +230,13 @@ export function TodayBoard({
             Students Today
           </h1>
           <p className="text-secondary">{date}</p>
+          <p className="mt-1 text-sm text-secondary">
+            Tip: press{" "}
+            <kbd className="rounded border border-secondary/30 bg-surface px-1.5 py-0.5 font-label text-xs text-primary">
+              Ctrl/Cmd + Enter
+            </kbd>{" "}
+            to save ninja data
+          </p>
         </div>
         <AddStudentDialog
           students={available}

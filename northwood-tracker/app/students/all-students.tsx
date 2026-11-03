@@ -10,12 +10,12 @@ import {
   earnedStars,
   type BeltInfo,
 } from "@/lib/belts";
+import { ExportButton } from "@/components/export-button";
 import { TagChips } from "@/components/tag-chips";
 import { TagPicker } from "@/components/tag-picker";
 import { activeTags } from "@/lib/tags";
 import { PROGRAMS } from "@/lib/options";
 import type { PurchaseRecord, SessionNote, Student } from "@/lib/students";
-import { ExportButton } from "./export-button";
 import { updateStudent, type StudentEdits } from "./actions";
 import { NewStudentDialog } from "./new-student-dialog";
 import { BeltBadge } from "./today/belt-badge";
@@ -107,7 +107,18 @@ export function AllStudents({
           All Students
         </h1>
         <div className="flex items-center gap-3">
-          <ExportButton />
+          <ExportButton
+            file={{
+              url: "/api/students/export",
+              name: "northwood-students",
+              extension: "csv",
+              description: "CSV file",
+              mimeType: "text/csv",
+              label: "Export CSV",
+              done: "Exported all students to CSV",
+              failed: "Couldn't export students. Try again.",
+            }}
+          />
           <NewStudentDialog belts={belts} onCreated={addStudent} />
         </div>
       </div>

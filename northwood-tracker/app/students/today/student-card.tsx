@@ -16,6 +16,7 @@ import {
 } from "@/lib/belts";
 import { TagChips } from "@/components/tag-chips";
 import { useToast } from "@/components/toast";
+import { copyText } from "@/lib/clipboard";
 import type { Activity, Belt, SessionNote, Student } from "@/lib/students";
 import {
   beltUp,
@@ -253,9 +254,13 @@ export function StudentCard({
 
   async function copyParentEmail() {
     if (!student.parent_email) return;
-    await navigator.clipboard.writeText(student.parent_email);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (await copyText(student.parent_email)) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      toast(`Copied ${student.parent_email}`);
+    } else {
+      toast("Couldn't copy the email. Select it and copy it instead.");
+    }
   }
 
   // Activity changes save right away. Level and belt ups ask first.
@@ -500,7 +505,9 @@ export function StudentCard({
                   title={copied ? "Copied!" : "Copy parent email"}
                   className="flex min-w-0 items-center gap-2 rounded-md border border-primary bg-(--card-bg) px-4 py-2 text-sm transition-colors hover:bg-neutral focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                 >
-                  <span className="truncate">{student.parent_email}</span>
+                  <span className="truncate">
+                    {copied ? "Copied!" : student.parent_email}
+                  </span>
                   {copied ? <CheckIcon /> : <CopyIcon />}
                 </button>
               ) : (

@@ -14,17 +14,32 @@ type SaveFilePicker = (options: {
   }>;
 }>;
 
-// Downloads every student as a CSV. Where the browser supports it, a "Save
-// as" window lets the user pick the folder and file name; otherwise it's a
+// A file the export button downloads: where from, what it's called, and
+// what to say about it.
+export type ExportFile = {
+  url: string;
+  // File name before the date and extension, e.g. "northwood-students".
+  name: string;
+  extension: "csv" | "json";
+  // For the "Save as" window, e.g. "CSV file".
+  description: string;
+  mimeType: string;
+  label: string;
+  done: string;
+  failed: string;
+};
+
+// Downloads a file from the app. Where the browser supports it, a "Save as"
+// window lets the user pick the folder and file name; otherwise it's a
 // normal download.
-export function ExportButton() {
+export function ExportButton({ file }: { file: ExportFile }) {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
 
-  async function exportCsv() {
-    const suggestedName = `northwood-students-${new Date()
+  async function exportFile() {
+    const suggestedName = `${file.name}-${new Date()
       .toLocaleDateString("en-US", { timeZone: "America/Los_Angeles" })
-      .replace(/\//g, "-")}.csv`;
+      .replace(/\//g, "-")}.${file.extension}`;
     const picker = (window as { showSaveFilePicker?: SaveFilePicker })
       .showSaveFilePicker;
 
@@ -36,17 +51,20 @@ export function ExportButton() {
         ? await picker({
             suggestedName,
             types: [
-              { description: "CSV file", accept: { "text/csv": [".csv"] } },
+              {
+                description: file.description,
+                accept: { [file.mimeType]: [`.${file.extension}`] },
+              },
             ],
           })
         : null;
 
-      const response = await fetch("/api/students/export");
+      const response = await fetch(file.url);
       // A signed-out request is redirected to the login page, so check that
-      // a CSV actually came back.
+      // the right kind of file actually came back.
       if (
         !response.ok ||
-        !response.headers.get("Content-Type")?.startsWith("text/csv")
+        !response.headers.get("Content-Type")?.startsWith(file.mimeType)
       ) {
         throw new Error(`Export failed: ${response.status}`);
       }
@@ -64,11 +82,11 @@ export function ExportButton() {
         link.click();
         URL.revokeObjectURL(url);
       }
-      toast("Exported all students to CSV");
+      toast(file.done);
     } catch (error) {
       // Closing the Save window isn't an error.
       if (error instanceof DOMException && error.name === "AbortError") return;
-      toast("Couldn't export students. Try again.");
+      toast(file.failed);
     } finally {
       setBusy(false);
     }
@@ -77,11 +95,11 @@ export function ExportButton() {
   return (
     <button
       type="button"
-      onClick={exportCsv}
+      onClick={exportFile}
       disabled={busy}
       className="rounded-md border border-primary px-5 py-3 text-sm text-primary transition-colors hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-wait disabled:opacity-60"
     >
-      {busy ? "Exporting…" : "Export CSV"}
+      {busy ? "Exporting…" : file.label}
     </button>
   );
 }

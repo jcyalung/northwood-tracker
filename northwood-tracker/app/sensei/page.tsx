@@ -1,11 +1,8 @@
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
 import { connection } from "next/server";
 import { Suspense } from "react";
-import { signOut } from "@/auth";
-import { SENSEI_COOKIE } from "@/lib/current-sensei";
 import { senseisCollection } from "@/lib/senseis";
-import { pickSensei } from "./actions";
+import { pickSensei, signOutAction } from "./actions";
 
 export const metadata: Metadata = {
   title: "Which Sensei? · Northwood Tracker",
@@ -28,11 +25,7 @@ export default function PickSenseiPage() {
           <SenseiChoices />
         </Suspense>
         <form
-          action={async () => {
-            "use server";
-            (await cookies()).delete(SENSEI_COOKIE);
-            await signOut({ redirectTo: "/login" });
-          }}
+          action={signOutAction}
           className="mt-6"
         >
           <button

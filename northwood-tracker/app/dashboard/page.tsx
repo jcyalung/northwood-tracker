@@ -12,11 +12,16 @@ import {
   getSessionHistory,
 } from "@/lib/students";
 import { ChartCard, ColumnChart, PieChart, StatTile } from "./charts";
-import { CurriculumJourney } from "./curriculum-journey";
+import { CurriculumJourney } from "@/components/curriculum-journey";
 import { DatabaseView, type DbQuery } from "./database-view";
 import { SenseisPanel } from "./senseis-panel";
 import { auth } from "@/auth";
+import { ExportButton } from "@/components/export-button";
+import { ToastProvider } from "@/components/toast";
+import { logsAfter, serverStatus } from "@/lib/logs";
+import { db } from "@/lib/mongodb";
 import { senseisCollection } from "@/lib/senseis";
+import { LogsPanel } from "./logs-panel";
 
 export const metadata: Metadata = {
   title: "Dashboard · Northwood Tracker",
@@ -26,20 +31,22 @@ export default function DashboardPage({
   searchParams,
 }: PageProps<"/dashboard">) {
   return (
-    <main className="mx-auto w-full max-w-[79.2rem] flex-1 px-4 py-8">
-      <Link
-        href="/"
-        className="font-label text-xs uppercase tracking-[0.08em] text-secondary hover:text-primary"
-      >
-        ← Menu
-      </Link>
-      <h1 className="mt-2 font-display text-[3.125rem] leading-tight text-primary">
-        Dashboard
-      </h1>
-      <Suspense fallback={<p className="mt-4 text-secondary">Loading…</p>}>
-        <Tabbed searchParams={searchParams} />
-      </Suspense>
-    </main>
+    <ToastProvider>
+      <main className="mx-auto w-full max-w-[79.2rem] flex-1 px-4 py-8">
+        <Link
+          href="/"
+          className="font-label text-xs uppercase tracking-[0.08em] text-secondary hover:text-primary"
+        >
+          ← Menu
+        </Link>
+        <h1 className="mt-2 font-display text-[3.125rem] leading-tight text-primary">
+          Dashboard
+        </h1>
+        <Suspense fallback={<p className="mt-4 text-secondary">Loading…</p>}>
+          <Tabbed searchParams={searchParams} />
+        </Suspense>
+      </main>
+    </ToastProvider>
   );
 }
 
@@ -48,6 +55,7 @@ const TABS = [
   { id: "curriculum", label: "Curriculum" },
   { id: "senseis", label: "Senseis" },
   { id: "database", label: "Database" },
+  { id: "logs", label: "Logs" },
 ] as const;
 
 // ?tab=overview (default) or ?tab=database (&collection=…&page=…).
@@ -82,7 +90,9 @@ async function Tabbed({
           </Link>
         ))}
       </nav>
-      {tab === "database" ? (
+      {tab === "logs" ? (
+        <LogsLoader />
+      ) : tab === "database" ? (
         <DatabaseViewLoader
           collection={one(params.collection)}
           page={Number(one(params.page)) || 1}
@@ -106,6 +116,17 @@ async function Tabbed({
         <Dashboard />
       )}
     </>
+  );
+}
+
+// The app's activity log, uptime, and errors, updated live.
+async function LogsLoader() {
+  await connection();
+  return (
+    <LogsPanel
+      initialEntries={logsAfter(0)}
+      initialStatus={await serverStatus(() => db.command({ ping: 1 }))}
+    />
   );
 }
 
@@ -138,13 +159,35 @@ async function CurriculumLoader() {
   );
 }
 
+// The manager also gets a download of the whole database.
 async function DatabaseViewLoader(props: {
   collection?: string;
   page: number;
   query: DbQuery;
 }) {
   await connection();
-  return <DatabaseView {...props} />;
+  const session = await auth();
+  return (
+    <>
+      {session?.user.account === "manager" && (
+        <div className="mt-6 flex justify-end">
+          <ExportButton
+            file={{
+              url: "/api/database/export",
+              name: "northwood-database",
+              extension: "json",
+              description: "JSON file",
+              mimeType: "application/json",
+              label: "Export database",
+              done: "Exported the database",
+              failed: "Couldn't export the database. Try again.",
+            }}
+          />
+        </div>
+      )}
+      <DatabaseView {...props} />
+    </>
+  );
 }
 
 // Reads MongoDB per request so the numbers are current.

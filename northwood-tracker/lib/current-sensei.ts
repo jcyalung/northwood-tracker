@@ -20,3 +20,12 @@ export async function editedBy(session: Session): Promise<string | undefined> {
   if (session.user.account === "manager") return "Manager";
   return (await currentSensei())?.first_name;
 }
+
+// Who a log entry says did something: "Manager", or the sensei's full name
+// on the center account ("Center" before one is picked).
+export async function logActor(session: Session | null): Promise<string> {
+  if (!session) return "Signed out";
+  if (session.user.account === "manager") return "Manager";
+  const sensei = await currentSensei().catch(() => null);
+  return sensei ? `${sensei.first_name} ${sensei.last_name}` : "Center";
+}

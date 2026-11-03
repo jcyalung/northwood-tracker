@@ -1,6 +1,8 @@
 "use server";
 
 import { auth } from "@/auth";
+import { logActor } from "@/lib/current-sensei";
+import { logIfFailed } from "@/lib/logs";
 import { db } from "@/lib/mongodb";
 import { catalogPrice } from "@/lib/store";
 import { studentsCollection } from "@/lib/students";
@@ -24,6 +26,19 @@ const MAX_ITEM_LENGTH = 80;
 // purchase. Catalog prices are set here, not trusted from the form; only
 // "Other" items use the submitted star count.
 export async function redeemStars(input: {
+  studentId: string;
+  item: string;
+  stars: number;
+}): Promise<RedeemResult> {
+  const result = await redeem(input);
+  if (!result.ok) {
+    const session = await auth();
+    logIfFailed(`star purchase (${input.item})`, result, await logActor(session));
+  }
+  return result;
+}
+
+async function redeem(input: {
   studentId: string;
   item: string;
   stars: number;
