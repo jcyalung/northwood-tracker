@@ -1,0 +1,13 @@
+[Unit]
+Description=Northwood Tracker automatic Save Day
+After=network-online.target docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=jcyal
+WorkingDirectory=/home/jcyal/Documents/northwood-tracker/northwood-tracker
+ExecStart=/home/jcyal/.config/nvm/versions/node/v24.14.1/bin/node --env-file=.env scripts/save-day.mjs
+# MongoDB may still be starting after a boot catch-up run.
+Restart=on-failure
+RestartSec=30

@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Northwood Tracker Save Day at 7 PM Pacific
+
+[Timer]
+OnCalendar=*-*-* 19:00:00 America/Los_Angeles
+# If the Pi was off at 7 PM, run at the next boot.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

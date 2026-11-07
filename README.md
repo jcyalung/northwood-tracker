@@ -22,18 +22,31 @@ stars they earn and spend.
   editing, new students, and CSV export.
 - **Star Store** — students redeem stars for prizes; balances can't go negative.
 - **Dashboard** — attendance and program/belt charts, the curriculum as an
-  interactive journey, and a read-only database browser (MongoDB or SQL view).
-- **Save Day** — saves all progress and records each student's last session.
+  interactive journey, the senseis list, a read-only database browser
+  (MongoDB or SQL view) with a manager-only export, and a live activity log.
+- **Debrief Helper** — a debrief checklist and talking points for every belt,
+  level and activity.
+- **Save Day** — saves all progress and records each student's last session
+  (also runs automatically at 7 PM).
+- **Backups** — a daily backup of the database and attendance, optionally
+  copied to Google Drive.
 
-## Stack
+## Documentation
 
-- [Next.js](https://nextjs.org) (App Router, Server Actions) + React + Tailwind CSS
-- MongoDB (Docker)
-- Email + password sign-in (Auth.js; passwords hashed with scrypt) for two
-  accounts: the manager, and a central account the senseis share. After
-  signing in to the central account, each sensei picks their name, and their
-  edits say "Last edited by <first name>"
-- Built to run on a Raspberry Pi 5
+| Guide | For |
+|---|---|
+| [User guide](docs/user-guide.md) | Signing in and using every page (senseis and the manager) |
+| [Running the Raspberry Pi](docs/raspberry-pi.md) | What runs on the Pi, startup, daily jobs, deploying changes, logs, safe shutdown, troubleshooting |
+| [Backups](docs/backups.md) | Daily backups to `data-backup/` and Google Drive, and restoring |
+| [Deploying on another computer](docs/deploying-elsewhere.md) | Running it on Linux or Windows, and moving the data |
+
+## Technologies
+
+- **Next.js 16** (App Router, Server Actions) with **React 19** and **Tailwind CSS 4**
+- **MongoDB**, in Docker, through the official MongoDB Node.js driver (v7)
+- **Auth.js** email + password sign-in (passwords hashed with scrypt)
+- On the Pi: **nginx** (port 80), **systemd** (the app and its daily jobs),
+  **avahi** (the `northwood.local` name), **rclone** (Google Drive backups)
 
 ## Running it locally
 
@@ -41,33 +54,21 @@ stars they earn and spend.
 docker compose up -d          # MongoDB on localhost:27017
 cd northwood-tracker
 npm install
-cp .env.example .env          # then fill in the values below
+cp .env.example .env          # then fill it in
 npm run dev                   # http://localhost:3000
 ```
 
-`.env` needs:
-
-| Variable | What it's for |
-|---|---|
-| `MONGODB_CONN` | MongoDB connection string |
-| `MONGODB_DB` | Database name (defaults to `northwood`) |
-| `AUTH_SECRET` | Session encryption (`npx auth secret`) |
-| `MANAGER_EMAIL` | The manager account (adds and removes senseis). Creates its password on first sign-in |
-| `CENTRAL_EMAIL` | The shared account senseis sign in with. Creates its password on first sign-in |
-| `STARS_PASSWORD` | Required to change a student's stars in All Students |
+The `.env` variables are described in
+[Running the Raspberry Pi → Configuration](docs/raspberry-pi.md#configuration-env-files).
 
 ## Data
 
 Student records, session notes, the curriculum, and belts live in MongoDB.
 Scripts in `northwood-tracker/scripts/migrate/` import them from spreadsheet
-exports and a curriculum file; source data is kept out of the repo (`rsrc/` is
-git-ignored) because it contains student information.
-
-## Docs
-
-Kept locally in `rsrc/` (git-ignored): the schema, page specs, the saving and
-live-update design (`PLAN.md`), and the Raspberry Pi deployment notes
-(`DEPLOY_PI.md`).
+exports and a curriculum file. Source data and backups are kept out of the
+repo (`rsrc/`, `export/` and `data-backup/` are git-ignored) because they
+contain student information. The Debrief Helper's text is in
+`northwood-tracker/content/debrief-help.md`.
 
 ## Icons
 

@@ -1,0 +1,13 @@
+[Unit]
+Description=Publish northwood.local via mDNS
+After=avahi-daemon.service network-online.target
+Requires=avahi-daemon.service
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/local/bin/northwood-mdns
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,19 @@
+[Unit]
+Description=Northwood Tracker (Next.js)
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+User=jcyal
+WorkingDirectory=/home/jcyal/Documents/northwood-tracker/northwood-tracker
+Environment=NODE_ENV=production
+Environment=PATH=/home/jcyal/.config/nvm/versions/node/v24.14.1/bin:/usr/bin:/bin
+ExecStart=/home/jcyal/.config/nvm/versions/node/v24.14.1/bin/node /home/jcyal/Documents/northwood-tracker/northwood-tracker/node_modules/next/dist/bin/next start -H 127.0.0.1 -p 3000
+Restart=on-failure
+RestartSec=5
+SuccessExitStatus=143
+
+[Install]
+WantedBy=multi-user.target
