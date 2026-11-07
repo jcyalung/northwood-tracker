@@ -194,6 +194,11 @@ then records today as each checked-in student's **last session** (what All
 Students shows and sorts by). The message says how many were checked in and
 debriefed, or which cards couldn't save.
 
+Save Day also starts a **backup** of the database and today's attendance (on
+the Pi and, if set up, Google Drive). It runs in the background, so you can
+keep working; you can check it finished in Dashboard → Logs. Clicking
+Save Day again while a backup runs just runs one more afterwards.
+
 The Pi also runs Save Day automatically at **7 PM** every day, so a forgotten
 click isn't a problem.
 
@@ -354,9 +359,9 @@ message and who did it:
 
 | Level | Color | Examples |
 |---|---|---|
-| Info | none | Sign-ins and sign-outs, sensei picked or switched, check-ins and removals, debriefs, Save Day, server started |
+| Info | none | Sign-ins and sign-outs, sensei picked or switched, check-ins and removals, debriefs, Save Day, backups started and finished, server started |
 | Warning | amber | Failed sign-in attempts (with the reason and device address), failed saves (notes, activity, level/belt up, purchases, student edits), check-ins that couldn't be saved |
-| Error | red | Server errors, database errors, lost database connection |
+| Error | red | Server errors, database errors, lost database connection, failed backups |
 
 Filter by **All / Warnings & errors / Errors**, by **Type**, and click
 **Live** to pause or resume updates.

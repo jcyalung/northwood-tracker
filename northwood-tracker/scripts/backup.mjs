@@ -14,7 +14,7 @@
 //   BACKUP_DIR            where to write (default: <repo root>/data-backup)
 //   BACKUP_RCLONE_REMOTE  rclone destination, e.g. "gdrive:Northwood Backups"
 import { spawnSync } from "node:child_process";
-import { mkdir, rename, rm, writeFile, access } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, writeFile, access } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { MongoClient } from "mongodb";
@@ -191,7 +191,17 @@ function copyToRemote() {
   }
   const result = spawnSync(
     "rclone",
-    ["copy", BACKUP_DIR, REMOTE, "--exclude", "*.partial/**", "--exclude", "*.partial"],
+    [
+      "copy",
+      BACKUP_DIR,
+      REMOTE,
+      "--exclude",
+      "*.partial/**",
+      "--exclude",
+      "*.partial",
+      "--exclude",
+      ".backup.lock",
+    ],
     { stdio: ["ignore", "inherit", "inherit"] },
   );
   if (result.error?.code === "ENOENT") {
@@ -207,22 +217,68 @@ function copyToRemote() {
   console.log(`Google Drive: copied ${BACKUP_DIR} to "${REMOTE}"`);
 }
 
+// One backup at a time (Save Day can start one while the 7:30 PM one runs):
+// wait for the other to finish. A lock left by a process that died is
+// taken over.
+const LOCK = path.join(BACKUP_DIR, ".backup.lock");
+const alive = (pid) => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error.code === "EPERM";
+  }
+};
+async function lock() {
+  await mkdir(BACKUP_DIR, { recursive: true });
+  const deadline = Date.now() + 20 * 60 * 1000;
+  let said = false;
+  for (;;) {
+    try {
+      await writeFile(LOCK, String(process.pid), { flag: "wx" });
+      return;
+    } catch (error) {
+      if (error.code !== "EEXIST") throw error;
+    }
+    const pid = Number(await readFile(LOCK, "utf8").catch(() => ""));
+    if (!pid || !alive(pid)) {
+      await rm(LOCK, { force: true });
+      continue;
+    }
+    if (Date.now() > deadline) {
+      throw new Error(`Another backup (process ${pid}) is still running`);
+    }
+    if (!said) console.log("Waiting for another backup to finish…");
+    said = true;
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+}
+const unlock = () => rm(LOCK, { force: true });
+
+try {
+  await lock();
+} catch (error) {
+  console.error(`Backup error: ${error.message}`);
+  process.exit(1);
+}
+
 const today = todayInPacific();
 console.log(`Backing up ${iso(today)} to ${BACKUP_DIR}`);
 
 const client = new MongoClient(process.env.MONGODB_CONN);
 try {
-  const db = client.db(process.env.MONGODB_DB || "northwood");
-  await backupDatabase(db, today);
-  await backupAttendance(db, today);
-} finally {
-  await client.close();
-}
-
-try {
+  try {
+    const db = client.db(process.env.MONGODB_DB || "northwood");
+    await backupDatabase(db, today);
+    await backupAttendance(db, today);
+  } finally {
+    await client.close();
+  }
   copyToRemote();
 } catch (error) {
   console.error(`Backup error: ${error.message}`);
+  await unlock();
   process.exit(1);
 }
+await unlock();
 console.log("Backup finished");

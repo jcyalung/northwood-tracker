@@ -14,7 +14,8 @@ export type LogCategory =
   | "check-in"
   | "debrief"
   | "save-day"
-  | "save";
+  | "save"
+  | "backup";
 
 export type LogEntry = {
   id: number;

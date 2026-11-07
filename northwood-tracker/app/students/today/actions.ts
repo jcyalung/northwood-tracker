@@ -5,6 +5,7 @@ import type { Session } from "next-auth";
 import { auth } from "@/auth";
 import { capitalize, earnedStars } from "@/lib/belts";
 import { editedBy, logActor } from "@/lib/current-sensei";
+import { startBackup } from "@/lib/backup-runner";
 import { log, logIfFailed } from "@/lib/logs";
 import { db } from "@/lib/mongodb";
 import { sessionHours, todayInPacific } from "@/lib/sessions";
@@ -660,5 +661,7 @@ export async function saveDay(): Promise<
     `Saved the day (${ids.length} ${ids.length === 1 ? "student" : "students"})`,
     { by: await logActor(session) },
   );
+  // Back up right away (runs in the background; see Dashboard → Logs).
+  startBackup("Save Day", await logActor(session));
   return { ok: true, students: ids.length };
 }

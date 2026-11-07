@@ -16,6 +16,7 @@ const CATEGORIES: { id: LogCategory; label: string }[] = [
   { id: "debrief", label: "Debriefs" },
   { id: "save-day", label: "Save Day" },
   { id: "save", label: "Failed saves" },
+  { id: "backup", label: "Backups" },
   { id: "database", label: "Database" },
   { id: "server", label: "Server" },
 ];

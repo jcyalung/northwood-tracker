@@ -13,8 +13,10 @@ Pi, and (once set up) copies them to Google Drive.
 
 ## What gets backed up
 
-Every day at **7:30 PM Pacific** (after the 7 PM automatic Save Day), the
-`northwood-backup.timer` runs:
+A backup runs **every time someone clicks Save Day** on Students Today (in
+the background; the result shows in Dashboard → Logs under "Backups"), and
+again every day at **7:30 PM Pacific** (after the 7 PM automatic Save Day),
+when the `northwood-backup.timer` runs:
 
 ```sh
 cd /home/jcyal/Documents/northwood-tracker/northwood-tracker
