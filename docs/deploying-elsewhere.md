@@ -142,11 +142,12 @@ Copy these unit files from `northwood-tracker/deploy/systemd/` in the repo, chan
 paths and Node path, then enable the timers:
 
 - `northwood-save-day.service` + `.timer` (7 PM Save Day)
-- `northwood-backup.service` + `.timer` (7:30 PM backup)
+- `northwood-backup.service` + `.timer` (7:30 PM attendance backup)
+- `northwood-database-backup.service` + `.timer` (Sunday 7:45 PM database backup)
 
 ```sh
 sudo systemctl daemon-reload
-sudo systemctl enable --now northwood-save-day.timer northwood-backup.timer
+sudo systemctl enable --now northwood-save-day.timer northwood-backup.timer northwood-database-backup.timer
 ```
 
 For Google Drive backups, install rclone and set it up as in
@@ -229,6 +230,7 @@ Windows has no systemd timers; create two scheduled tasks instead:
 |---|---|---|---|---|
 | Northwood Save Day | Daily 7:00 PM | `node` | `--env-file=.env scripts\save-day.mjs` | `...\northwood-tracker\northwood-tracker` |
 | Northwood Backup | Daily 7:30 PM | `node` | `--env-file=.env scripts\backup.mjs` | `...\northwood-tracker\northwood-tracker` |
+| Northwood Database Backup | Weekly, Sunday 7:45 PM | `node` | `--env-file=.env scripts\backup.mjs --database` | `...\northwood-tracker\northwood-tracker` |
 
 On each task tick *Run task as soon as possible after a scheduled start is
 missed* (the same catch-up as the Pi's timers). Set the PC's time zone to

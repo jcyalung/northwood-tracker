@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 import { log } from "@/lib/logs";
 
-// Runs scripts/backup.mjs (database + attendance to data-backup/, then
+// Runs scripts/backup.mjs (attendance CSVs to data-backup/, then
 // Google Drive) in the background, e.g. after Save Day. The result goes to
 // Dashboard → Logs. Presses while one is running are combined into one more
 // run afterwards, so the backup always ends up with the latest data.

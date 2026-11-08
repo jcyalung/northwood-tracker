@@ -1,5 +1,5 @@
 [Unit]
-Description=Northwood Tracker daily backup (data-backup/ and Google Drive)
+Description=Northwood Tracker nightly attendance backup (data-backup/ and Google Drive)
 After=network-online.target docker.service
 Wants=network-online.target
 Requires=docker.service

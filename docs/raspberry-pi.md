@@ -32,11 +32,13 @@ is in its `northwood-tracker/` folder.
 | **nginx** | Web server in front of the app | `/etc/nginx/sites-available/northwood`: port 80 → `127.0.0.1:3000`. Buffering is off so live updates stream. |
 | **northwood.local** | The name devices use | systemd `northwood-mdns.service` runs `/usr/local/bin/northwood-mdns`, which publishes `northwood.local` over mDNS (avahi) for the Pi's current LAN IP and re-publishes it if the IP changes. |
 | **Save Day at 7 PM** | Automatic Save Day | systemd `northwood-save-day.timer` → `northwood-save-day.service` |
-| **Backup at 7:30 PM** | Daily backup (and Google Drive copy if set up) | systemd `northwood-backup.timer` → `northwood-backup.service` ([Backups](backups.md)) |
+| **Backup at 7:30 PM** | Nightly attendance backup (and Google Drive copy if set up); also after every Save Day | systemd `northwood-backup.timer` → `northwood-backup.service` ([Backups](backups.md)) |
+| **Database backup, Sundays 7:45 PM** | Weekly whole-database backup (and Google Drive copy) | systemd `northwood-database-backup.timer` → `northwood-database-backup.service` |
 
 The service files are in `/etc/systemd/system/` (`northwood.service`,
 `northwood-mdns.service`, `northwood-save-day.service`/`.timer`,
-`northwood-backup.service`/`.timer`). Copies of all of them (and the
+`northwood-backup.service`/`.timer`,
+`northwood-database-backup.service`/`.timer`). Copies of all of them (and the
 `northwood-mdns` script) are kept in the repo at
 `northwood-tracker/deploy/systemd/`; if you change one on the Pi, update the
 copy too.
@@ -60,7 +62,7 @@ In order:
    is up.
 3. **northwood.service** starts the app (it waits for Docker).
 4. **nginx** serves port 80.
-5. **Timers** are armed. If the Pi was off at 7 PM or 7:30 PM, the missed
+5. **Timers** are armed. If the Pi was off at 7 PM, 7:30 PM or (Sundays) 7:45 PM, the missed
    Save Day and backup run now (`Persistent=true`).
 
 ---
@@ -83,21 +85,31 @@ In order:
 - If MongoDB is still starting, the service retries every 30 seconds.
 - Log: `journalctl -u northwood-save-day`.
 
-### Backup, 7:30 PM Pacific
+### Attendance backup, 7:30 PM Pacific (and after Save Day)
 
 - Timer: `northwood-backup.timer` (daily at 7:30 PM Pacific,
-  `Persistent=true`, so a missed backup runs at the next boot).
+  `Persistent=true`, so a missed backup runs at the next boot). The app also
+  starts one after every Save Day click.
 - Runs: `node --env-file=.env scripts/backup.mjs` in `northwood-tracker/`.
-- Writes the database and attendance CSVs to `data-backup/` at the repo root,
-  and copies them to Google Drive if that's set up.
+- Writes attendance CSVs to `data-backup/` at the repo root, and copies them
+  to Google Drive if that's set up.
+- Log: `journalctl -u northwood-backup` (Save Day ones: Dashboard → Logs).
+
+### Database backup, Sundays 7:45 PM Pacific
+
+- Timer: `northwood-database-backup.timer` (weekly, `Persistent=true`).
+- Runs: `node --env-file=.env scripts/backup.mjs --database`.
+- Writes the whole database to `data-backup/database-backups/`, and copies it
+  to Google Drive (**Northwood Backups/database-backups/**).
+- Log: `journalctl -u northwood-database-backup`.
 - Details, file layout and restoring: [Backups](backups.md).
-- Log: `journalctl -u northwood-backup`.
 
 Run either job by hand at any time:
 
 ```sh
 sudo systemctl start northwood-save-day.service
 sudo systemctl start northwood-backup.service
+sudo systemctl start northwood-database-backup.service
 ```
 
 See when they next run:
@@ -203,7 +215,7 @@ db.accounts.deleteOne({ email: "<the account email>" })
 | Today only | `journalctl -u northwood --since today` |
 | Just problems | `journalctl -u northwood --since today \| grep -E "\[(warn\|error)\]"` |
 | Save Day job | `journalctl -u northwood-save-day` |
-| Backup job | `journalctl -u northwood-backup` |
+| Backup jobs | `journalctl -u northwood-backup`, `journalctl -u northwood-database-backup` |
 | northwood.local name | `journalctl -u northwood-mdns -n 5` |
 | Every web request | `sudo tail -f /var/log/nginx/access.log` |
 | MongoDB | `docker logs mongodb --tail 50` |

@@ -13,29 +13,36 @@ Pi, and (once set up) copies them to Google Drive.
 
 ## What gets backed up
 
-A backup runs **every time someone clicks Save Day** on Students Today (in
-the background; the result shows in Dashboard → Logs under "Backups"), and
-again every day at **7:30 PM Pacific** (after the 7 PM automatic Save Day),
-when the `northwood-backup.timer` runs:
+There are two backups:
+
+| Backup | When | What |
+|---|---|---|
+| **Attendance** | Every **Save Day** click, and nightly at **7:30 PM** (`northwood-backup.timer`) | One CSV per day of who was checked in |
+| **Database** | Weekly, **Sundays at 7:45 PM** (`northwood-database-backup.timer`) | The whole database |
+
+Both are Pacific time, and both run at the next boot if the Pi was off
+(`Persistent=true`). Save Day backups run in the background; the result
+shows in Dashboard → Logs under "Backups".
 
 ```sh
 cd /home/jcyal/Documents/northwood-tracker/northwood-tracker
-node --env-file=.env scripts/backup.mjs
+node --env-file=.env scripts/backup.mjs              # attendance
+node --env-file=.env scripts/backup.mjs --database   # database
 ```
 
-It writes two things:
-
-1. **The database**: every collection (students, session notes, sessions,
-   senseis, belts, belt paths, purchases, …) as a JSON file, **except
-   `accounts`** (password hashes stay off backups). Each file is a JSON array
-   of that collection's documents, without MongoDB's internal `_id`.
-2. **Attendance**: one CSV per day listing who was checked in, with columns
+1. **Attendance**: one CSV per day listing who was checked in, with columns
    `date, first_name, last_name, hour`. Days that don't have a CSV yet
    (including past days, the first time it runs) are filled in, so the
    attendance history is complete.
+2. **Database**: every collection (students, session notes, sessions,
+   senseis, belts, belt paths, purchases, …) as a JSON file, **except
+   `accounts`** (password hashes stay off backups). Each file is a JSON array
+   of that collection's documents, without MongoDB's internal `_id`. Because
+   it's weekly, restoring one loses changes made since that Sunday; for
+   anything newer, use **Dashboard → Database → Export database** first.
 
-If the Pi was off at 7:30 PM, the backup runs at the next boot
-(`Persistent=true`).
+Two backups never run at the same time: if one starts while another is
+running, it waits.
 
 ---
 
@@ -49,8 +56,15 @@ year and month:
 data-backup/
   2026/
     11/
-      database/
-        2026-11-05/
+      attendance/
+        2026-11-05.csv
+        2026-11-06.csv
+    12/
+      …
+  database-backups/
+    2026/
+      11/
+        2026-11-08/
           students.json
           session_notes.json
           sessions.json
@@ -58,14 +72,12 @@ data-backup/
           belts.json
           belt_paths.json
           purchases.json
-        2026-11-06/
+        2026-11-15/
           …
-      attendance/
-        2026-11-05.csv
-        2026-11-06.csv
-    12/
-      …
 ```
+
+Google Drive's **Northwood Backups** folder has the same layout, so the
+weekly database snapshots are in **Northwood Backups/database-backups/**.
 
 An attendance CSV looks like:
 
@@ -75,7 +87,7 @@ date,first_name,last_name,hour
 ```
 
 **`data-backup/` contains student information.** It's git-ignored and must
-never be committed or shared publicly. Each daily database snapshot is a
+never be committed or shared publicly. Each weekly database snapshot is a
 full copy, so you can delete old month folders if disk space ever gets low
 (the Pi's SD card has plenty of room for years of these).
 
@@ -127,18 +139,21 @@ To turn Drive copying off, remove the `BACKUP_RCLONE_REMOTE` line.
 ## Running a backup by hand
 
 ```sh
-sudo systemctl start northwood-backup.service     # same as the nightly run
-journalctl -u northwood-backup -n 20              # what it did
+sudo systemctl start northwood-backup.service            # attendance (the nightly run)
+sudo systemctl start northwood-database-backup.service   # database (the weekly run)
+journalctl -u northwood-backup -n 20                     # what they did
+journalctl -u northwood-database-backup -n 20
 ```
 
 Or directly:
 
 ```sh
 cd /home/jcyal/Documents/northwood-tracker/northwood-tracker
-node --env-file=.env scripts/backup.mjs
+node --env-file=.env scripts/backup.mjs              # attendance
+node --env-file=.env scripts/backup.mjs --database   # database
 ```
 
-When the next backup is due: `systemctl list-timers northwood-backup.timer`.
+When the next backups are due: `systemctl list-timers 'northwood-*'`.
 
 The manager can also download the whole database at any time from
 **Dashboard → Database → Export database** (one JSON file).
@@ -167,9 +182,9 @@ node --env-file=.env scripts/migrate/load.mjs ~/Downloads/<export>.json <databas
 node --env-file=.env scripts/migrate/load.mjs ~/Downloads/<export>.json <database> --write    # do it
 ```
 
-### From a daily backup folder
+### From a weekly database backup folder
 
-The daily backup has **one file per collection**, so combine a day's files
+The database backup has **one file per collection**, so combine a day's files
 into one first:
 
 ```sh
@@ -182,7 +197,7 @@ for (const f of fs.readdirSync(dir)) {
 }
 fs.writeFileSync("restore.json", JSON.stringify(out));
 console.log("Wrote restore.json:", Object.keys(out).join(", "));
-' ../data-backup/2026/11/database/2026-11-06
+' ../data-backup/database-backups/2026/11/2026-11-08
 
 node --env-file=.env scripts/migrate/load.mjs restore.json <database>            # dry run
 node --env-file=.env scripts/migrate/load.mjs restore.json <database> --write    # do it

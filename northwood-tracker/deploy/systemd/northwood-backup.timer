@@ -1,5 +1,5 @@
 [Unit]
-Description=Run the Northwood Tracker backup at 7:30 PM Pacific
+Description=Run the Northwood Tracker attendance backup at 7:30 PM Pacific
 
 [Timer]
 OnCalendar=*-*-* 19:30:00 America/Los_Angeles

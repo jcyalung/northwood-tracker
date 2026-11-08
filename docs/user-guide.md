@@ -194,7 +194,7 @@ then records today as each checked-in student's **last session** (what All
 Students shows and sorts by). The message says how many were checked in and
 debriefed, or which cards couldn't save.
 
-Save Day also starts a **backup** of the database and today's attendance (on
+Save Day also starts a **backup** of today's attendance (on
 the Pi and, if set up, Google Drive). It runs in the background, so you can
 keep working; you can check it finished in Dashboard → Logs. Clicking
 Save Day again while a backup runs just runs one more afterwards.

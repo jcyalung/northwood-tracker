@@ -28,8 +28,8 @@ stars they earn and spend.
   level and activity.
 - **Save Day** — saves all progress and records each student's last session
   (also runs automatically at 7 PM).
-- **Backups** — a daily backup of the database and attendance, optionally
-  copied to Google Drive.
+- **Backups** — attendance backed up nightly and on every Save Day, the
+  whole database weekly (Sundays), both copied to Google Drive.
 
 ## Documentation
 
@@ -37,7 +37,7 @@ stars they earn and spend.
 |---|---|
 | [User guide](docs/user-guide.md) | Signing in and using every page (senseis and the manager) |
 | [Running the Raspberry Pi](docs/raspberry-pi.md) | What runs on the Pi, startup, daily jobs, deploying changes, logs, safe shutdown, troubleshooting |
-| [Backups](docs/backups.md) | Daily backups to `data-backup/` and Google Drive, and restoring |
+| [Backups](docs/backups.md) | Attendance (nightly) and database (weekly) backups to `data-backup/` and Google Drive, and restoring |
 | [Deploying on another computer](docs/deploying-elsewhere.md) | Running it on Linux or Windows, and moving the data |
 
 ## Technologies

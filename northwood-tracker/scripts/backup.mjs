@@ -1,15 +1,18 @@
-// Daily backup: writes the whole database (as JSON, one file per collection)
-// and each day's check-ins (as CSV) to data-backup/ at the repo root,
-// partitioned by year and month, then copies that folder to Google Drive
-// if BACKUP_RCLONE_REMOTE is set. Run daily at 7:30 PM Pacific by the
-// northwood-backup systemd timer (see deploy/systemd/).
+// Backups to data-backup/ at the repo root, partitioned by year and month,
+// then copied to Google Drive if BACKUP_RCLONE_REMOTE is set.
 //
-//   data-backup/YYYY/MM/database/YYYY-MM-DD/<collection>.json
+// Attendance (default): each day's check-ins as CSV. Run nightly at 7:30 PM
+// Pacific (northwood-backup timer) and after every Save Day.
 //   data-backup/YYYY/MM/attendance/YYYY-MM-DD.csv
+//
+// Database (--database): the whole database as JSON, one file per
+// collection. Run weekly, Sundays at 7:45 PM Pacific
+// (northwood-database-backup timer). See deploy/systemd/.
+//   data-backup/database-backups/YYYY/MM/YYYY-MM-DD/<collection>.json
 //
 // The `accounts` collection (password hashes) is never backed up.
 //
-// Usage: node --env-file=.env scripts/backup.mjs
+// Usage: node --env-file=.env scripts/backup.mjs [--database]
 // Optional .env settings:
 //   BACKUP_DIR            where to write (default: <repo root>/data-backup)
 //   BACKUP_RCLONE_REMOTE  rclone destination, e.g. "gdrive:Northwood Backups"
@@ -82,7 +85,13 @@ function hourValue(hour) {
 }
 
 async function backupDatabase(db, today) {
-  const dir = path.join(monthDir(today), "database", iso(today));
+  const dir = path.join(
+    BACKUP_DIR,
+    "database-backups",
+    today.year,
+    today.month,
+    iso(today),
+  );
   const tmp = `${dir}.partial`;
   await rm(tmp, { recursive: true, force: true });
   await mkdir(tmp, { recursive: true });
@@ -263,14 +272,17 @@ try {
 }
 
 const today = todayInPacific();
-console.log(`Backing up ${iso(today)} to ${BACKUP_DIR}`);
+const DATABASE = process.argv.includes("--database");
+console.log(
+  `Backing up ${DATABASE ? "the database" : "attendance"} for ${iso(today)} to ${BACKUP_DIR}`,
+);
 
 const client = new MongoClient(process.env.MONGODB_CONN);
 try {
   try {
     const db = client.db(process.env.MONGODB_DB || "northwood");
-    await backupDatabase(db, today);
-    await backupAttendance(db, today);
+    if (DATABASE) await backupDatabase(db, today);
+    else await backupAttendance(db, today);
   } finally {
     await client.close();
   }

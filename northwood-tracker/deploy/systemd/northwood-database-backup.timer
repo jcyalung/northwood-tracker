@@ -1,0 +1,10 @@
+[Unit]
+Description=Run the Northwood Tracker database backup Sundays at 7:45 PM Pacific
+
+[Timer]
+OnCalendar=Sun *-*-* 19:45:00 America/Los_Angeles
+# If the Pi was off then, run at the next boot.
+Persistent=true
+
+[Install]
+WantedBy=timers.target
